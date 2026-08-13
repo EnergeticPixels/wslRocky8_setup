@@ -163,6 +163,7 @@ main() {
 
 	log "Starting Rocky provisioning on $SP_OS_NAME"
 	sp_pkg_refresh_cache
+	sp_pkg_upgrade_refresh
 	sp_pkg_install "${BASE_PACKAGES[@]}"
 
 	bootstrap_env_file

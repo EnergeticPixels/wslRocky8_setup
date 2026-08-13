@@ -41,6 +41,7 @@ usage() {
 	cat <<'EOF'
 Usage:
   provisioning.sh init
+	provisioning.sh validate-platform
   provisioning.sh wizard
   provisioning.sh config show
   provisioning.sh config get KEY
@@ -62,6 +63,10 @@ require_env_file() {
 	if [[ ! -f "$ENV_PATH" ]]; then
 		fail "Missing .env at $ENV_PATH. Run './provisioning.sh init' first."
 	fi
+}
+
+require_supported_platform() {
+	sp_require_rocky8 || exit 1
 }
 
 validate_env_key() {
@@ -531,6 +536,7 @@ wizard() {
 
 wizard_command() {
 	local proceed
+	require_supported_platform
 
 	while true; do
 		wizard
@@ -712,13 +718,21 @@ validate_with_libs() {
 }
 
 validate_command() {
+	require_supported_platform
 	require_env_file
 	validate_with_libs
 	log "Validation succeeded."
 }
 
+validate_platform_command() {
+	require_supported_platform
+	log "Platform validation succeeded: $SP_OS_NAME"
+}
+
 plan_command() {
 	local web_summary web_ssl_enable web_ssl_base_domain web_ssl_redirect
+
+	require_supported_platform
 
 	require_env_file
 	validate_with_libs
@@ -904,6 +918,7 @@ run_full_provisioning() {
 
 	log "Starting Rocky provisioning on $SP_OS_NAME"
 	sp_pkg_refresh_cache
+	sp_pkg_upgrade_refresh
 	sp_pkg_install "${BASE_PACKAGES[@]}"
 
 	bootstrap_env_file
@@ -997,6 +1012,7 @@ run_command() {
 
 logs_command() {
 	local target_user target_home log_path
+	require_supported_platform
 
 	target_user="${SUDO_USER:-${USER:-}}"
 	target_home="$HOME"
@@ -1061,6 +1077,7 @@ main() {
 
 	case "$command" in
 		init) init_env_file ;;
+		validate-platform) validate_platform_command ;;
 		wizard) wizard_command ;;
 		config) config_command "$@" ;;
 		validate) validate_command ;;
