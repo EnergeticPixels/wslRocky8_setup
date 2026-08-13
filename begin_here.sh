@@ -31,6 +31,24 @@ log() {
 	printf '[%s] %s\n' "$(date +'%Y-%m-%d %H:%M:%S')" "$*"
 }
 
+normalize_env_file_permissions() {
+	local env_file="$SCRIPT_DIR/.env"
+
+	if [[ ! -f "$env_file" ]]; then
+		return 0
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
+		chown "$SUDO_USER:$SUDO_USER" "$env_file" 2>/dev/null || true
+		chmod 600 "$env_file" 2>/dev/null || true
+		return 0
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+		chmod 600 "$env_file" 2>/dev/null || true
+	fi
+}
+
 require_root() {
 	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
 		echo "This script must run as root. Use: sudo bash begin_here.sh" >&2
@@ -44,6 +62,7 @@ bootstrap_env_file() {
 
 	if [[ ! -f "$env_file" && -f "$env_sample_file" ]]; then
 		cp "$env_sample_file" "$env_file"
+		normalize_env_file_permissions
 		log "Created $env_file from .env.sample. Update values before key generation if needed."
 	fi
 }

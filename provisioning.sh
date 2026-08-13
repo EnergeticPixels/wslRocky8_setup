@@ -64,6 +64,26 @@ require_env_file() {
 	if [[ ! -f "$ENV_PATH" ]]; then
 		fail "Missing .env at $ENV_PATH. Run './provisioning.sh init' first."
 	fi
+
+	if [[ ! -r "$ENV_PATH" ]]; then
+		fail "Cannot read $ENV_PATH. Fix permissions (for example: sudo chown $USER:$USER $ENV_PATH && chmod 600 $ENV_PATH)."
+	fi
+}
+
+normalize_env_file_permissions() {
+	if [[ ! -f "$ENV_PATH" ]]; then
+		return 0
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
+		chown "$SUDO_USER:$SUDO_USER" "$ENV_PATH" 2>/dev/null || true
+		chmod 600 "$ENV_PATH" 2>/dev/null || true
+		return 0
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+		chmod 600 "$ENV_PATH" 2>/dev/null || true
+	fi
 }
 
 require_supported_platform() {
@@ -142,6 +162,7 @@ set_env_key() {
 	' "$ENV_PATH" > "$temp_file"
 
 	mv "$temp_file" "$ENV_PATH"
+	normalize_env_file_permissions
 }
 
 unset_env_key() {
@@ -154,6 +175,7 @@ unset_env_key() {
 	temp_file="$(mktemp)"
 	awk -v key="$key" '$0 !~ "^[[:space:]]*" key "=" { print }' "$ENV_PATH" > "$temp_file"
 	mv "$temp_file" "$ENV_PATH"
+	normalize_env_file_permissions
 }
 
 get_env_key() {
@@ -244,6 +266,7 @@ init_env_file() {
 	fi
 
 	cp "$ENV_SAMPLE_PATH" "$ENV_PATH"
+	normalize_env_file_permissions
 	log "Created .env from .env.sample"
 }
 
@@ -792,6 +815,7 @@ require_root() {
 bootstrap_env_file() {
 	if [[ ! -f "$ENV_PATH" && -f "$ENV_SAMPLE_PATH" ]]; then
 		cp "$ENV_SAMPLE_PATH" "$ENV_PATH"
+		normalize_env_file_permissions
 		log "Created $ENV_PATH from .env.sample. Update values before key generation if needed."
 	fi
 }
