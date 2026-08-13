@@ -6,16 +6,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
+# shellcheck source=/dev/null
+source "$SCRIPTS_DIR/lib/platform.sh"
+# shellcheck source=/dev/null
+source "$SCRIPTS_DIR/lib/packages.sh"
+
 BASE_PACKAGES=(
 	ca-certificates
-	apt-transport-https
 	curl
 	gnupg2
-	lsb-release
 	git
 	wget
-	build-essential
-	libssl-dev
+	tar
+	gcc
+	gcc-c++
+	make
+	openssl-devel
+	dnf-plugins-core
 	ripgrep
 )
 
@@ -151,13 +158,12 @@ show_public_keys() {
 
 main() {
 	require_root
-	export DEBIAN_FRONTEND=noninteractive
+	sp_require_rocky8
 	setup_logging
 
-	log "Starting Rocky provisioning"
-	apt-get update
-	# apt-get dist-upgrade -y
-	apt-get install -y "${BASE_PACKAGES[@]}"
+	log "Starting Rocky provisioning on $SP_OS_NAME"
+	sp_pkg_refresh_cache
+	sp_pkg_install "${BASE_PACKAGES[@]}"
 
 	bootstrap_env_file
 	log "Starting multiplexer setup (tmux)"

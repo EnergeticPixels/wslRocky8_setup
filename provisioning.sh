@@ -8,16 +8,23 @@ ENV_SAMPLE_PATH="$ROOT_DIR/.env.sample"
 ENV_PATH="$ROOT_DIR/.env"
 SCRIPTS_DIR="$ROOT_DIR/scripts"
 
+# shellcheck source=/dev/null
+source "$SCRIPTS_DIR/lib/platform.sh"
+# shellcheck source=/dev/null
+source "$SCRIPTS_DIR/lib/packages.sh"
+
 BASE_PACKAGES=(
 	ca-certificates
-	apt-transport-https
 	curl
 	gnupg2
-	lsb-release
 	git
 	wget
-	build-essential
-	libssl-dev
+	tar
+	gcc
+	gcc-c++
+	make
+	openssl-devel
+	dnf-plugins-core
 	ripgrep
 )
 
@@ -892,13 +899,12 @@ run_only_component() {
 run_full_provisioning() {
 	local keys_changed_flag
 
-	export DEBIAN_FRONTEND=noninteractive
+	sp_require_rocky8
 	setup_logging
 
-	log "Starting Rocky provisioning"
-	apt-get update
-	# apt-get dist-upgrade -y
-	apt-get install -y "${BASE_PACKAGES[@]}"
+	log "Starting Rocky provisioning on $SP_OS_NAME"
+	sp_pkg_refresh_cache
+	sp_pkg_install "${BASE_PACKAGES[@]}"
 
 	bootstrap_env_file
 	log "Starting multiplexer setup (tmux)"
@@ -970,6 +976,7 @@ run_command() {
 	done
 
 	require_root
+	sp_require_rocky8
 
 	if [[ "$dry_run" == "true" ]]; then
 		log "Dry run enabled."
@@ -1001,7 +1008,7 @@ logs_command() {
 		fi
 	fi
 
-	log_path="$target_home/.debian_build/logs/latest.log"
+	log_path="$target_home/.serverprovo_build/logs/latest.log"
 	if [[ ! -f "$log_path" ]]; then
 		fail "No log found at $log_path"
 	fi
