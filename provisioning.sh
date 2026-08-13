@@ -91,19 +91,105 @@ require_supported_platform() {
 }
 
 ensure_wizard_prerequisites() {
-	if command -v rg >/dev/null 2>&1; then
+	local sudo_cmd
+	sudo_cmd=()
+
+	if command -v rg >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
 		return 0
 	fi
 
 	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-		fail "Missing required command 'rg' (ripgrep). Install it first or run wizard with sudo."
+		sudo_cmd=(sudo)
 	fi
 
-	log "Installing missing prerequisite package: ripgrep (enabling EPEL first)"
-	dnf install -y epel-release || true
-	if ! dnf install -y ripgrep; then
-		fail "ripgrep installation failed. Ensure EPEL is enabled and repositories are reachable, then retry."
+	log "Installing missing baseline tools: tar and ripgrep"
+	"${sudo_cmd[@]}" dnf install -y epel-release || true
+	if ! "${sudo_cmd[@]}" dnf install -y tar ripgrep; then
+		fail "Failed to install tar/ripgrep. Ensure repositories are reachable, then retry."
 	fi
+}
+
+ensure_wsl_systemd_enabled() {
+	local wsl_conf_path temp_file
+
+	if ! sp_is_wsl; then
+		return 0
+	fi
+
+	wsl_conf_path="/etc/wsl.conf"
+	temp_file="$(mktemp)"
+
+	if [[ -f "$wsl_conf_path" ]]; then
+		awk '
+		BEGIN { in_boot = 0; boot_seen = 0; systemd_set = 0 }
+		{
+			if ($0 ~ /^[[:space:]]*\[boot\][[:space:]]*$/) {
+				boot_seen = 1
+				in_boot = 1
+				print
+				next
+			}
+
+			if ($0 ~ /^[[:space:]]*\[[^]]+\][[:space:]]*$/) {
+				if (in_boot == 1 && systemd_set == 0) {
+					print "systemd=true"
+					systemd_set = 1
+				}
+				in_boot = 0
+			}
+
+			if (in_boot == 1 && $0 ~ /^[[:space:]]*systemd[[:space:]]*=/) {
+				if (systemd_set == 0) {
+					print "systemd=true"
+					systemd_set = 1
+				}
+				next
+			}
+
+			print
+		}
+		END {
+			if (boot_seen == 0) {
+				print ""
+				print "[boot]"
+				print "systemd=true"
+			} else if (in_boot == 1 && systemd_set == 0) {
+				print "systemd=true"
+			}
+		}
+		' "$wsl_conf_path" > "$temp_file"
+
+		if ! cmp -s "$wsl_conf_path" "$temp_file"; then
+			mv "$temp_file" "$wsl_conf_path"
+			log "Updated /etc/wsl.conf to set [boot] systemd=true"
+		else
+			rm -f "$temp_file"
+			log "/etc/wsl.conf already has [boot] systemd=true"
+		fi
+	else
+		cat > "$wsl_conf_path" <<'EOF'
+[boot]
+systemd=true
+EOF
+		log "Created /etc/wsl.conf with [boot] systemd=true"
+	fi
+
+	if [[ ! -d /run/systemd/system ]]; then
+		log "WSL systemd config applied. Restart WSL (wsl --shutdown) and reopen this distro for systemctl support."
+	fi
+}
+
+wizard_preflight_before_run_prompt() {
+	local sudo_cmd
+	sudo_cmd=()
+
+	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+		sudo_cmd=(sudo)
+	fi
+
+	log "Refreshing system packages before final run confirmation"
+	"${sudo_cmd[@]}" dnf upgrade --refresh -y
+	ensure_wizard_prerequisites
 }
 
 validate_env_key() {
@@ -575,14 +661,21 @@ wizard() {
 }
 
 wizard_command() {
-	local proceed
+	local proceed preflight_done
 	require_supported_platform
-	ensure_wizard_prerequisites
+	preflight_done=false
 
 	while true; do
 		wizard
 		echo ""
 		plan_command
+
+		if [[ "$preflight_done" != "true" ]]; then
+			echo ""
+			wizard_preflight_before_run_prompt
+			preflight_done=true
+		fi
+
 		echo ""
 		proceed="$(read_bool 'Proceed with provisioning?' 'true')"
 
@@ -907,10 +1000,21 @@ run_core_script() {
 
 	log "Running $script_name"
 
+	if [[ "${EUID:-$(id -u)}" -eq 0 && -z "${SUDO_USER:-}" ]]; then
+		case "$script_name" in
+			ssh_gen.sh|gpg_gen.sh|git-config.sh)
+				fail "Cannot run $script_name as root without SUDO_USER. Run provisioning with sudo from your normal user account."
+				;;
+		esac
+	fi
+
 	if [[ "${EUID:-$(id -u)}" -eq 0 && -n "${SUDO_USER:-}" ]]; then
 		case "$script_name" in
 			ssh_gen.sh|gpg_gen.sh|git-config.sh|node_install.sh)
-				sudo -u "$SUDO_USER" -H bash "$script_path"
+				sudo -u "$SUDO_USER" -H env \
+					KEYS_CHANGED_FLAG="${KEYS_CHANGED_FLAG:-}" \
+					PROVISIONING_NONINTERACTIVE="${PROVISIONING_NONINTERACTIVE:-}" \
+					bash "$script_path"
 				return 0
 				;;
 		esac
@@ -922,6 +1026,40 @@ run_core_script() {
 	fi
 
 	bash "$script_path"
+}
+
+verify_identity_assets() {
+	local target_user target_home gpg_email ssh_pub
+
+	target_user="${SUDO_USER:-}"
+	target_home="$HOME"
+
+	if [[ -n "$target_user" ]]; then
+		target_home="$(getent passwd "$target_user" | cut -d: -f6 || true)"
+		[[ -z "$target_home" ]] && target_home="$HOME"
+	fi
+
+	load_env_file
+	gpg_email="${GIT_EMAIL:-}"
+	ssh_pub="$target_home/.ssh/id_github.pub"
+
+	if [[ ! -f "$ssh_pub" ]]; then
+		fail "SSH public key was not generated at $ssh_pub"
+	fi
+
+	if [[ -z "$gpg_email" ]]; then
+		fail "GIT_EMAIL is required to validate GPG key generation."
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -eq 0 && -n "$target_user" ]]; then
+		if ! sudo -u "$target_user" -H gpg --batch --list-secret-keys "$gpg_email" >/dev/null 2>&1; then
+			fail "No GPG secret key found for $gpg_email in user keyring ($target_user)."
+		fi
+	else
+		if ! gpg --batch --list-secret-keys "$gpg_email" >/dev/null 2>&1; then
+			fail "No GPG secret key found for $gpg_email in current user keyring."
+		fi
+	fi
 }
 
 run_only_component() {
@@ -959,6 +1097,7 @@ run_full_provisioning() {
 	setup_logging
 
 	log "Starting Rocky provisioning on $SP_OS_NAME"
+	ensure_wsl_systemd_enabled
 	sp_pkg_refresh_cache
 	sp_pkg_upgrade_refresh
 	sp_pkg_install "${BASE_PACKAGES[@]}"
@@ -997,6 +1136,7 @@ run_full_provisioning() {
 
 	run_core_script "$SCRIPTS_DIR/ssh_gen.sh"
 	run_core_script "$SCRIPTS_DIR/gpg_gen.sh"
+	verify_identity_assets
 	run_core_script "$SCRIPTS_DIR/git-config.sh"
 
 	if [[ -f "$KEYS_CHANGED_FLAG" ]]; then

@@ -38,6 +38,36 @@ if [[ -f "$PLATFORM_LIB" ]]; then
 	sp_require_rocky8
 fi
 
+systemd_is_available() {
+	command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]
+}
+
+start_httpd() {
+	if systemd_is_available; then
+		systemctl enable --now httpd
+		return 0
+	fi
+
+	if command -v apachectl >/dev/null 2>&1; then
+		apachectl -k restart || apachectl -k start
+		log "Started httpd via apachectl because systemd is unavailable in this session."
+		return 0
+	fi
+
+	echo "Unable to start httpd automatically: neither active systemd nor apachectl is available." >&2
+	return 1
+}
+
+start_php_fpm() {
+	if systemd_is_available; then
+		systemctl enable --now "$PHP_FPM_SERVICE_NAME"
+		return 0
+	fi
+
+	log "Skipping automatic php-fpm service start because systemd is unavailable in this session."
+	return 0
+}
+
 configure_apache_php_fpm() {
 	local php_socket conf_file
 	php_socket="$PHP_FPM_SOCKET"
@@ -64,9 +94,11 @@ if php_is_enabled; then
 	configure_apache_php_fpm
 
 	log "Configuring Apache for php-fpm version $PHP_VERSION."
-	systemctl enable --now "$PHP_FPM_SERVICE_NAME"
-	systemctl enable --now httpd
-	systemctl restart httpd
+	start_php_fpm
+	start_httpd
+	if systemd_is_available; then
+		systemctl restart httpd
+	fi
 	log "Apache configured with php-fpm version $PHP_VERSION."
 else
 	log "PHP installation disabled by PHP_ENABLE=false."
@@ -75,14 +107,18 @@ fi
 if web_ssl_is_enabled; then
 	log "WEB_SSL_ENABLE=true. Configuring Apache SSL via mkcert for base domain: $WEB_SSL_BASE_DOMAIN"
 	apache_ssl_setup "$WEB_SSL_BASE_DOMAIN"
-	systemctl restart httpd
+	if systemd_is_available; then
+		systemctl restart httpd
+	else
+		apachectl -k restart || apachectl -k start
+	fi
 	log "Apache SSL provisioning complete."
 else
 	log "Apache SSL provisioning disabled by WEB_SSL_ENABLE=false."
 fi
 
 if ! php_is_enabled; then
-	systemctl enable --now httpd || true
+	start_httpd || true
 fi
 
 log "Apache installation complete."
