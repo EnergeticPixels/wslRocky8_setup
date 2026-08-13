@@ -3,8 +3,9 @@
 ## 1) Prepare the system
 
 ```bash
-sudo apt update
-sudo apt dist-upgrade
+sudo dnf makecache
+sudo dnf upgrade --refresh
+sudo dnf install -y git tar
 ```
 
 ## 2) Clone or copy the repository

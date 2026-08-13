@@ -1,6 +1,6 @@
 # WSL Notes and Service Behavior
 
-This repository targets Windows 11 + WSL2 + Debian. Some behavior depends on systemd availability.
+This repository targets Windows 11 + WSL2 + Rocky Linux 8. Some behavior depends on systemd availability.
 
 ## systemd impact
 

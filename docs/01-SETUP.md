@@ -5,15 +5,16 @@
 This repository is designed for:
 - Windows 11 host
 - WSL2 guest
-- Debian (Trixie)
+- Rocky Linux 8
 
 ## Base preparation
 
 Before running provisioning on a fresh environment:
 
 ```bash
-sudo apt update
-sudo apt dist-upgrade
+sudo dnf makecache
+sudo dnf upgrade --refresh
+sudo dnf install -y git tar
 ```
 
 ## Configuration file flow
@@ -27,12 +28,12 @@ The wizard can also create `.env` when it is missing. Use `./provisioning.sh val
 ## Hostname resolution for local SSL URLs
 
 If you enable web SSL and choose a `.local` developer URL, add that URL to the host machine HOSTS file.
-Without this step, the URL will not resolve from outside the Debian guest environment.
+Without this step, the URL will not resolve from outside the Rocky guest environment.
 The selected `WEB_SSL_BASE_DOMAIN` is used by both Apache and Nginx SSL provisioning.
 
 Recommended mapping targets:
 - `127.0.0.1` (localhost routing)
-- Debian 13 WSL2 guest IP (direct guest routing)
+- Rocky 8 WSL2 guest IP (direct guest routing)
 
 Use only the mapping that matches your setup.
 

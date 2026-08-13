@@ -57,17 +57,17 @@ Nginx redirect behavior when SSL is enabled:
 ### Host OS HOSTS file requirement
 
 If the URL should work from the host computer, add `WEB_SSL_BASE_DOMAIN` to the host OS HOSTS file.
-Without this step, name resolution can fail outside Debian.
+Without this step, name resolution can fail outside the Rocky WSL guest.
 
 Map to either:
 - `127.0.0.1` when localhost forwarding is used
-- WSL2 Debian guest IP for direct guest routing
+- WSL2 Rocky guest IP for direct guest routing
 
 ### Windows browser trust (Edge and Chrome)
 
 If Windows browsers still show Not Secure after hosts mapping, trust the mkcert root CA in Windows.
 
-1. In Debian/WSL, print the mkcert CA directory used by provisioning:
+1. In Rocky/WSL, print the mkcert CA directory used by provisioning:
 
 ```bash
 sudo mkcert -CAROOT

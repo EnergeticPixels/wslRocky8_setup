@@ -18,7 +18,7 @@ Set in `.env`:
 - `JAVA_ENABLE=true` to enable Java provisioning (default: `false`)
 - `JAVA_VERSION=8` for legacy compatibility
 - `JAVA_SERVER_MODE=tomcat` or `JAVA_SERVER_MODE=jar`
-- `JAVA_DISTRO=temurin` (recommended on Debian 13)
+- `JAVA_DISTRO=temurin` (recommended baseline for Rocky 8 migration)
 
 If `JAVA_SERVER_MODE=jar`, also set:
 - `JAVA_APP_JAR_PATH=/absolute/path/to/app.jar`

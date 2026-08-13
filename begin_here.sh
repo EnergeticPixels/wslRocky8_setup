@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Phase 1 contract target: Rocky Linux 8 on WSL2.
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 
@@ -52,7 +54,7 @@ setup_logging() {
 		target_home="$HOME"
 	fi
 
-	log_dir="$target_home/.debian_build/logs"
+	log_dir="$target_home/.serverprovo_build/logs"
 	timestamp="$(date +'%Y%m%d_%H%M%S')"
 	LOG_FILE="$log_dir/provision_${timestamp}.log"
 	log_file_name="$(basename "$LOG_FILE")"
@@ -152,7 +154,7 @@ main() {
 	export DEBIAN_FRONTEND=noninteractive
 	setup_logging
 
-	log "Starting Debian provisioning"
+	log "Starting Rocky provisioning"
 	apt-get update
 	# apt-get dist-upgrade -y
 	apt-get install -y "${BASE_PACKAGES[@]}"

@@ -12,7 +12,8 @@ Use this folder as the primary reference for provisioning and configuration deta
 6. [Databases](05-DATABASES.md)
 7. [Redis](06-CACHE-STORE.md)
 8. [WSL Notes](07-WSL-NOTES.md)
-9. [Config Reference](CONFIG-REFERENCE.md)
+9. [Rocky 8 Compatibility Contract](08-ROCKY-COMPATIBILITY-CONTRACT.md)
+10. [Config Reference](CONFIG-REFERENCE.md)
 
 ## Topic Index
 
@@ -25,4 +26,5 @@ Use this folder as the primary reference for provisioning and configuration deta
 - MariaDB/PostgreSQL/MongoDB: [Databases](05-DATABASES.md)
 - Redis provisioning: [Cache Store](06-CACHE-STORE.md)
 - systemd and WSL caveats: [WSL Notes](07-WSL-NOTES.md)
+- Rocky platform assumptions and path mappings: [Rocky 8 Compatibility Contract](08-ROCKY-COMPATIBILITY-CONTRACT.md)
 - Complete variable list: [Config Reference](CONFIG-REFERENCE.md)

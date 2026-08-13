@@ -1,14 +1,23 @@
-# WSL Debian Provisioning Kit
+# WSL Rocky Provisioning Kit
 
-Opinionated provisioning scripts for Windows 11 + WSL2 (Debian/Trixie) focused on app development and Moodle testing.
+Opinionated provisioning scripts for Windows 11 + WSL2 (Rocky Linux 8) focused on app development and Moodle testing.
+
+## Support Contract
+
+Current target scope:
+- Rocky Linux 8 on WSL2
+- Windows 11 host
+- Rooted provisioning via `sudo bash ./provisioning.sh run`
+
+This project no longer treats Debian as a primary onboarding target.
 
 ## Quickstart
 
 1. Update system packages:
 
 ```bash
-sudo apt update
-sudo apt dist-upgrade
+sudo dnf makecache
+sudo dnf upgrade --refresh
 ```
 
 2. Copy this repository into your Linux home directory.
@@ -21,7 +30,7 @@ sudo apt dist-upgrade
 
 The wizard saves `.env`, displays the provisioning plan, and starts the run after confirmation.
 
-### Fresh clone quick start (Debian 13 WSL)
+### Fresh clone quick start (Rocky 8 WSL)
 
 If you cloned the repo directly (recommended), run:
 
@@ -80,11 +89,11 @@ Config helpers:
 ### Local DNS requirement for .local developer URLs
 
 When using web SSL with a custom `.local` URL, you must add that URL to the host machine HOSTS file.
-If this is skipped, the URL will not resolve from outside Debian (for example, from a browser on the host OS).
+If this is skipped, the URL will not resolve from outside the WSL guest (for example, from a browser on the host OS).
 
 Map the selected `WEB_SSL_BASE_DOMAIN` to one of the following:
 - `127.0.0.1` when traffic is forwarded to localhost
-- Debian WSL2 guest IP when resolving directly to the guest
+- Rocky WSL2 guest IP when resolving directly to the guest
 
 Example HOSTS entries:
 
@@ -101,7 +110,7 @@ For Nginx SSL setups, you can control HTTP redirect behavior with `WEB_SSL_FORCE
 
 If Edge or Chrome on Windows shows Not Secure for your local HTTPS URL, import the mkcert root CA into Windows Trusted Root Certification Authorities.
 
-In Debian/WSL:
+In Rocky/WSL:
 
 ```bash
 sudo mkcert -CAROOT
@@ -142,6 +151,7 @@ Keys are managed automatically during each `provisioning.sh run`:
 - [05 - Databases (MariaDB, PostgreSQL, MongoDB)](docs/05-DATABASES.md)
 - [06 - Cache Store (Redis)](docs/06-CACHE-STORE.md)
 - [07 - WSL Notes and Service Behavior](docs/07-WSL-NOTES.md)
+- [08 - Rocky 8 Compatibility Contract](docs/08-ROCKY-COMPATIBILITY-CONTRACT.md)
 - [Config Reference (.env variables)](docs/CONFIG-REFERENCE.md)
 
 ## Script Entry Points

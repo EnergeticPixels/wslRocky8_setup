@@ -123,7 +123,7 @@ systemctl status mongod
 
 Behavior highlights:
 - Uses official MongoDB apt repository
-- On Debian trixie and unknown codenames, falls back to MongoDB `bookworm` track
+- During Rocky migration, repository resolution is being standardized for EL8-compatible tracks
 - Starts services using `systemctl` or `service` fallback
 
 Direct install script:
