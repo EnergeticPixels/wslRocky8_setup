@@ -54,6 +54,12 @@ load_web_stack_env() {
 	if [[ -z "${WEB_SSL_FORCE_HTTPS_REDIRECT:-}" && -n "${web_ssl_force_https_redirect:-}" ]]; then
 		WEB_SSL_FORCE_HTTPS_REDIRECT="$web_ssl_force_https_redirect"
 	fi
+	if [[ -z "${PHP_FPM_SERVICE_NAME:-}" && -n "${php_fpm_service_name:-}" ]]; then
+		PHP_FPM_SERVICE_NAME="$php_fpm_service_name"
+	fi
+	if [[ -z "${PHP_FPM_SOCKET:-}" && -n "${php_fpm_socket:-}" ]]; then
+		PHP_FPM_SOCKET="$php_fpm_socket"
+	fi
 
 	PHP_ENABLE="${PHP_ENABLE:-false}"
 	PHP_VERSION="${PHP_VERSION:-7.4}"
@@ -66,7 +72,8 @@ load_web_stack_env() {
 	WEB_SSL_BASE_DOMAIN="${WEB_SSL_BASE_DOMAIN:-app.local}"
 	WEB_SSL_CERT_EXPIRY="${WEB_SSL_CERT_EXPIRY:-1y}"
 	WEB_SSL_FORCE_HTTPS_REDIRECT="${WEB_SSL_FORCE_HTTPS_REDIRECT:-true}"
-	PHP_FPM_SERVICE_NAME="php-fpm"
+	PHP_FPM_SERVICE_NAME="${PHP_FPM_SERVICE_NAME:-php-fpm}"
+	PHP_FPM_SOCKET="${PHP_FPM_SOCKET:-/run/php-fpm/www.sock}"
 
 	case "$(printf '%s' "$PHP_ENABLE" | tr '[:upper:]' '[:lower:]')" in
 		1|true|yes|y|on)
@@ -133,6 +140,16 @@ load_web_stack_env() {
 			;;
 	esac
 
+	if [[ -z "$PHP_FPM_SERVICE_NAME" ]]; then
+		echo "PHP_FPM_SERVICE_NAME cannot be empty." >&2
+		exit 1
+	fi
+
+	if [[ -z "$PHP_FPM_SOCKET" || "$PHP_FPM_SOCKET" != /* ]]; then
+		echo "Invalid PHP_FPM_SOCKET '$PHP_FPM_SOCKET'. Use an absolute unix socket path like /run/php-fpm/www.sock" >&2
+		exit 1
+	fi
+
 	export WEB_SERVER
 	export PHP_ENABLE
 	export PHP_VERSION
@@ -146,6 +163,7 @@ load_web_stack_env() {
 	export WEB_SSL_CERT_EXPIRY
 	export WEB_SSL_FORCE_HTTPS_REDIRECT
 	export PHP_FPM_SERVICE_NAME
+	export PHP_FPM_SOCKET
 }
 
 web_ssl_is_enabled() {

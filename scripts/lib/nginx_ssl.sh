@@ -155,9 +155,22 @@ nginx_ssl_generate_certificate() {
 }
 
 nginx_ssl_write_server_block() {
-	local base_domain force_https_redirect
+	local base_domain force_https_redirect php_fpm_socket
 	base_domain="$(normalize_domain_local "$1")"
 	force_https_redirect="${WEB_SSL_FORCE_HTTPS_REDIRECT:-true}"
+	php_fpm_socket="${PHP_FPM_SOCKET:-/run/php-fpm/www.sock}"
+
+	mkdir -p /etc/nginx/snippets
+	cat > /etc/nginx/snippets/php-fpm.conf <<EOF
+location ~ \.php$ {
+	include snippets/fastcgi-php.conf;
+	fastcgi_pass unix:${php_fpm_socket};
+}
+
+location ~ /\.ht {
+	deny all;
+}
+EOF
 
 	if [[ -f "/etc/nginx/snippets/php-fpm.conf" ]]; then
 		if [[ "$force_https_redirect" == "true" ]]; then

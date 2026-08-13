@@ -39,12 +39,12 @@ if [[ -f "$PLATFORM_LIB" ]]; then
 fi
 
 configure_nginx_php_fpm() {
-	local php_socket snippet_file default_site
-	php_socket="/run/php-fpm/www.sock"
+	local php_socket snippet_file default_d_file
+	php_socket="$PHP_FPM_SOCKET"
 	snippet_file="/etc/nginx/snippets/php-fpm.conf"
-	default_site="/etc/nginx/conf.d/default.conf"
+	default_d_file="/etc/nginx/default.d/php-fpm.conf"
 
-	mkdir -p /etc/nginx/snippets
+	mkdir -p /etc/nginx/snippets /etc/nginx/default.d
 	cat > "$snippet_file" <<EOF
 location ~ \.php$ {
     include snippets/fastcgi-php.conf;
@@ -56,9 +56,9 @@ location ~ /\.ht {
 }
 EOF
 
-	if [[ -f "$default_site" ]] && ! grep -q "include snippets/php-fpm.conf;" "$default_site"; then
-		sed -i '/^[[:space:]]*index /a \    include snippets/php-fpm.conf;' "$default_site"
-	fi
+	cat > "$default_d_file" <<EOF
+include snippets/php-fpm.conf;
+EOF
 }
 
 log "Installing Nginx web server (nginx)."

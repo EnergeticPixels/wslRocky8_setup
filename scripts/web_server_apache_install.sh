@@ -40,7 +40,7 @@ fi
 
 configure_apache_php_fpm() {
 	local php_socket conf_file
-	php_socket="/run/php-fpm/www.sock"
+	php_socket="$PHP_FPM_SOCKET"
 	conf_file="/etc/httpd/conf.d/php-fpm.conf"
 
 	cat > "$conf_file" <<EOF
