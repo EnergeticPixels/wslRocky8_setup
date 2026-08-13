@@ -14,16 +14,17 @@ Before running provisioning on a fresh environment:
 ```bash
 sudo dnf makecache
 sudo dnf upgrade --refresh
-sudo dnf install -y git tar
+sudo dnf install -y git tar epel-release ripgrep
 ```
 
 ## Configuration file flow
 
 1. Copy `.env.sample` to `.env`
 2. Edit values based on your setup profile
-3. Run `./provisioning.sh wizard` to review the generated plan and confirm the provisioning run
+3. Run `bash ./provisioning.sh validate-platform` to confirm Rocky target compatibility
+4. Run `bash ./provisioning.sh wizard` to review the generated plan and confirm the provisioning run
 
-The wizard can also create `.env` when it is missing. Use `./provisioning.sh validate` or `./provisioning.sh plan` independently when needed.
+The wizard can also create `.env` when it is missing. Use `bash ./provisioning.sh validate` or `bash ./provisioning.sh plan` independently when needed.
 
 ## Hostname resolution for local SSL URLs
 

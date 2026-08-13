@@ -20,7 +20,7 @@ Out of scope for this contract:
 - Base bootstrap commands:
   - `sudo dnf makecache`
   - `sudo dnf upgrade --refresh`
-  - `sudo dnf install -y git tar`
+  - `sudo dnf install -y git tar epel-release ripgrep`
 
 ### Service management
 - Primary service manager: `systemctl`

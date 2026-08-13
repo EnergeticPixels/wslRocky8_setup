@@ -26,8 +26,8 @@ If `JAVA_SERVER_MODE=jar`, also set:
 - `JAVA_APP_ARGS=` (optional)
 
 Tomcat notes:
-- Prefers `tomcat9` from apt when available
-- Falls back to manual Apache Tomcat 9 under `/opt/tomcat` if apt package is unavailable
+- Prefers distro `tomcat` package from dnf when available
+- Falls back to manual Apache Tomcat 9 under `/opt/tomcat` if package is unavailable
 
 ## Node.js with NVM
 

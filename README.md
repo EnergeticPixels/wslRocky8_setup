@@ -18,6 +18,7 @@ This project no longer treats Debian as a primary onboarding target.
 ```bash
 sudo dnf makecache
 sudo dnf upgrade --refresh
+sudo dnf install -y git tar epel-release ripgrep
 ```
 
 2. Copy this repository into your Linux home directory.
@@ -25,7 +26,7 @@ sudo dnf upgrade --refresh
 4. Start the provisioning wizard:
 
 ```bash
-./provisioning.sh wizard
+bash ./provisioning.sh wizard
 ```
 
 The wizard saves `.env`, displays the provisioning plan, and starts the run after confirmation.
@@ -39,14 +40,15 @@ cd /path/to/your/cloned/repo
 chmod +x provisioning.sh
 
 # Create .env from .env.sample
-./provisioning.sh init
+bash ./provisioning.sh init
 
 # Interactive setup, inline plan review, and confirmation
-./provisioning.sh wizard
+bash ./provisioning.sh wizard
 
 # Optional validation and plan commands
-./provisioning.sh validate
-./provisioning.sh plan
+bash ./provisioning.sh validate-platform
+bash ./provisioning.sh validate
+bash ./provisioning.sh plan
 
 # Run provisioning
 sudo bash ./provisioning.sh run
@@ -59,16 +61,16 @@ The wizard always uses plain text question-and-answer prompts in the terminal.
 
 ```bash
 # Create .env from .env.sample
-./provisioning.sh init
+bash ./provisioning.sh init
 
 # Run interactive configuration, plan review, and confirmation
-./provisioning.sh wizard
+bash ./provisioning.sh wizard
 
 # Validate current .env values against script validators
-./provisioning.sh validate
+bash ./provisioning.sh validate
 
 # Show what provisioning will run with current .env
-./provisioning.sh plan
+bash ./provisioning.sh plan
 
 # Run full provisioning
 sudo bash ./provisioning.sh run
@@ -80,10 +82,10 @@ sudo bash ./provisioning.sh run --only db
 Config helpers:
 
 ```bash
-./provisioning.sh config show
-./provisioning.sh config get DATABASE_TYPE
-./provisioning.sh config set DATABASE_TYPE=postgres POSTGRESQL_VERSION=17
-./provisioning.sh config unset TMUX_CONFIG_URL
+bash ./provisioning.sh config show
+bash ./provisioning.sh config get DATABASE_TYPE
+bash ./provisioning.sh config set DATABASE_TYPE=postgres POSTGRESQL_VERSION=17
+bash ./provisioning.sh config unset TMUX_CONFIG_URL
 ```
 
 ### Local DNS requirement for .local developer URLs
@@ -136,7 +138,7 @@ sudo bash ./provisioning.sh run --dry-run
 sudo bash ./provisioning.sh run --only node --dry-run
 
 # Show recent provisioning logs
-./provisioning.sh logs
+bash ./provisioning.sh logs
 ```
 
 ### SSH and GPG key management

@@ -11,7 +11,7 @@ Common examples:
 
 ```bash
 sudo service mariadb start
-sudo service redis-server start
+sudo service redis start
 ```
 
 ## GPG terminal note

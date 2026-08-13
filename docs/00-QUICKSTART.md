@@ -5,7 +5,7 @@
 ```bash
 sudo dnf makecache
 sudo dnf upgrade --refresh
-sudo dnf install -y git tar
+sudo dnf install -y git tar epel-release ripgrep
 ```
 
 ## 2) Clone or copy the repository
@@ -15,11 +15,12 @@ Keep it inside your Linux home directory in WSL.
 ## 3) Start the provisioning wizard
 
 ```bash
-./provisioning.sh init
-./provisioning.sh wizard
+bash ./provisioning.sh init
+bash ./provisioning.sh validate-platform
+bash ./provisioning.sh wizard
 ```
 
-The wizard collects your configuration, displays the plan inline, and starts provisioning after confirmation. Use `./provisioning.sh validate` or `./provisioning.sh plan` separately when needed.
+The wizard collects your configuration, displays the plan inline, and starts provisioning after confirmation. Use `bash ./provisioning.sh validate` or `bash ./provisioning.sh plan` separately when needed.
 
 ## 4) Optional one-component installs
 

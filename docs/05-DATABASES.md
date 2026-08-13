@@ -86,7 +86,7 @@ systemctl status postgresql
 
 Behavior highlights:
 - Installs versioned packages when available
-- Falls back to default `postgresql` packages when requested versioned package is unavailable
+- Falls back to default PostgreSQL packages when requested versioned package is unavailable
 - Starts services using `systemctl` or `service` fallback
 
 Direct install script:
@@ -94,6 +94,10 @@ Direct install script:
 ```bash
 sudo bash scripts/postgresql_install.sh
 ```
+
+Service note:
+- Versioned installs may run under `postgresql-<version>` service units.
+- Fallback installs use `postgresql` service.
 
 ## MongoDB
 
@@ -122,8 +126,8 @@ systemctl status mongod
 ```
 
 Behavior highlights:
-- Uses official MongoDB apt repository
-- During Rocky migration, repository resolution is being standardized for EL8-compatible tracks
+- Uses official MongoDB EL8 yum repository
+- Repository configuration is written under `/etc/yum.repos.d/`
 - Starts services using `systemctl` or `service` fallback
 
 Direct install script:

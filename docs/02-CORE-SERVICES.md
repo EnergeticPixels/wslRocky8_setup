@@ -55,8 +55,8 @@ sudo bash scripts/git-config.sh
 Installed via `scripts/vim_install.sh`.
 
 The script:
-- Ensures `vim` is installed via apt
-- Registers Vim via `update-alternatives`
+- Ensures `vim` is installed via dnf
+- Registers Vim via `alternatives`
 - Writes `/etc/profile.d/editor.sh` with `EDITOR=vim` and `VISUAL=vim`
 
 Run only Vim setup:

@@ -11,7 +11,7 @@ Set these in `.env`:
 ## Version behavior
 
 - The installer validates format (for example: `7.0` or `7.0.15`)
-- Installation uses distro apt repositories
+- Installation uses Rocky dnf repositories
 - If the installed version differs from the requested `REDIS_VERSION`, the script logs a warning
 
 ## Run Redis only
@@ -25,13 +25,13 @@ sudo bash scripts/redis_install.sh
 ```bash
 redis-server --version
 redis-cli ping
-systemctl status redis-server
+systemctl status redis
 ```
 
 If systemd is unavailable, use service fallback:
 
 ```bash
-sudo service redis-server start
+sudo service redis start
 ```
 
 See also: [WSL Notes](07-WSL-NOTES.md)

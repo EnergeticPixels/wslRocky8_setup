@@ -3,7 +3,7 @@
 ## Web server selection
 
 Set `WEB_SERVER` in `.env`:
-- `WEB_SERVER=apache` installs Apache (`apache2` package)
+- `WEB_SERVER=apache` installs Apache (`httpd` package)
 - `WEB_SERVER=nginx` installs Nginx (`nginx` package)
 
 If `WEB_SERVER` is unset, web server installation is skipped.
@@ -39,16 +39,16 @@ When enabled, provisioning:
 - Enables web-server-specific SSL site configuration
 
 Apache certificate and site files:
-- `/etc/apache2/ssl/serverprovo-local.crt`
-- `/etc/apache2/ssl/serverprovo-local.key`
-- `/etc/apache2/ssl/serverprovo-domains.txt`
-- `/etc/apache2/sites-available/serverprovo-ssl.conf`
+- `/etc/httpd/ssl/serverprovo-local.crt`
+- `/etc/httpd/ssl/serverprovo-local.key`
+- `/etc/httpd/ssl/serverprovo-domains.txt`
+- `/etc/httpd/conf.d/serverprovo-ssl.conf`
 
 Nginx certificate and site files:
 - `/etc/nginx/ssl/serverprovo-local.crt`
 - `/etc/nginx/ssl/serverprovo-local.key`
 - `/etc/nginx/ssl/serverprovo-domains.txt`
-- `/etc/nginx/sites-available/serverprovo-ssl.conf`
+- `/etc/nginx/conf.d/serverprovo-ssl.conf`
 
 Nginx redirect behavior when SSL is enabled:
 - `WEB_SSL_FORCE_HTTPS_REDIRECT=true`: HTTP traffic redirects to HTTPS
@@ -90,13 +90,13 @@ Note:
 ### Troubleshooting
 
 - Ensure local trust was initialized: `mkcert -install`
-- Check Apache config: `sudo apache2ctl configtest`
+- Check Apache config: `sudo httpd -t`
 - Check Nginx config: `sudo nginx -t`
-- Confirm SSL module: `sudo apache2ctl -M | grep ssl_module`
+- Confirm Apache service: `sudo systemctl status httpd`
 - Check cert expiry and SANs:
 
 ```bash
-sudo openssl x509 -in /etc/apache2/ssl/serverprovo-local.crt -noout -dates -ext subjectAltName
+sudo openssl x509 -in /etc/httpd/ssl/serverprovo-local.crt -noout -dates -ext subjectAltName
 sudo openssl x509 -in /etc/nginx/ssl/serverprovo-local.crt -noout -dates -ext subjectAltName
 ```
 
@@ -126,10 +126,14 @@ Database driver extension selection:
 - `PHP_DB_DRIVER_MODE=auto|mysql|postgres|none`
 - In `auto` mode, selection follows `DATABASE_TYPE`
 
+PHP-FPM integration controls:
+- `PHP_FPM_SERVICE_NAME=php-fpm` (default)
+- `PHP_FPM_SOCKET=/run/php-fpm/www.sock` (default)
+
 Behavior details:
 - Apache and Nginx use `php-fpm` integration
-- Scripts prefer distro packages first
-- If requested version is unavailable, installer adds Sury repository and retries
+- Scripts use Rocky packages and Remi module streams for PHP versions
+- `PHP_FPM_SOCKET` is used consistently for Apache, Nginx, and Nginx SSL server blocks
 - Lowercase compatibility keys are accepted (`php_enable`, `php_version`, etc.)
 
 Current baseline profile:

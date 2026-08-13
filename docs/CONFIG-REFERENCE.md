@@ -35,8 +35,10 @@ Central reference for frequently used `.env` variables.
 
 ## Python
 
-- Python-related options are handled by `scripts/python_install.sh`
-- Keep script-specific values in `.env` when introduced
+- `PYTHON_ENABLE=true|false`
+- `PYTHON_DATA_SCIENCE_STACK_ENABLE=true|false`
+- `PYTHON_DEV_MODE=none|flask|reflex|both`
+- `PYTHON_VENV_PATH` (optional override)
 
 ## Web server and PHP
 
@@ -48,6 +50,8 @@ Central reference for frequently used `.env` variables.
 - `WEB_SSL_FORCE_HTTPS_REDIRECT=true|false` (NGINX only; when true, HTTP redirects to HTTPS)
 - `PHP_ENABLE=true|false`
 - `PHP_VERSION=7.4|8.0|8.1|8.2|8.3`
+- `PHP_FPM_SERVICE_NAME` (default: `php-fpm`)
+- `PHP_FPM_SOCKET` (default: `/run/php-fpm/www.sock`)
 - `PHP_EXTENSIONS_BASELINE=common|none`
 - `PHP_EXTENSIONS_EXTRA` (comma-separated)
 - `PHP_EXTENSIONS_STRICT=true|false`
@@ -58,6 +62,7 @@ SSL behavior in current phase:
 - Nginx: SSL execution active when `WEB_SSL_ENABLE=true`
 - Certificate SANs are generated for base domain and wildcard (`app.local` + `*.app.local`)
 - For Nginx, `WEB_SSL_FORCE_HTTPS_REDIRECT=true` enables automatic HTTP to HTTPS redirects
+- `PHP_FPM_SOCKET` is used for Apache, Nginx, and Nginx SSL php-fpm routing
 
 Baseline map:
 - `common`: `mbstring`, `xml`, `curl`, `zip`, `intl`, `gd`, `bcmath`, `opcache`, `readline`
