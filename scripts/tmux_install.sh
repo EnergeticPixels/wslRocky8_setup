@@ -62,7 +62,7 @@ resolve_target_home() {
 }
 
 log "Installing tmux..."
-apt-get install -y tmux
+dnf install -y tmux
 log "tmux installation complete."
 
 # --- tmux configuration ---

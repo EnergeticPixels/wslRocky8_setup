@@ -31,11 +31,18 @@ fi
 # shellcheck source=/dev/null
 source "$NGINX_SSL_LIB"
 
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
 configure_nginx_php_fpm() {
 	local php_socket snippet_file default_site
-	php_socket="/run/php/php${PHP_VERSION}-fpm.sock"
+	php_socket="/run/php-fpm/www.sock"
 	snippet_file="/etc/nginx/snippets/php-fpm.conf"
-	default_site="/etc/nginx/sites-available/default"
+	default_site="/etc/nginx/conf.d/default.conf"
 
 	mkdir -p /etc/nginx/snippets
 	cat > "$snippet_file" <<EOF
@@ -55,7 +62,7 @@ EOF
 }
 
 log "Installing Nginx web server (nginx)."
-apt-get install -y nginx
+dnf install -y nginx
 
 restart_nginx=false
 
@@ -68,7 +75,7 @@ if php_is_enabled; then
 	configure_nginx_php_fpm
 
 	log "Configuring Nginx for php-fpm version $PHP_VERSION."
-	systemctl enable --now "php${PHP_VERSION}-fpm"
+	systemctl enable --now "$PHP_FPM_SERVICE_NAME"
 	restart_nginx=true
 	log "Nginx configured with php-fpm version $PHP_VERSION."
 else
@@ -86,8 +93,13 @@ fi
 
 if [[ "$restart_nginx" == "true" ]]; then
 	nginx -t
+	systemctl enable nginx || true
 	systemctl restart nginx
 	log "Nginx service restarted with current configuration."
+fi
+
+if [[ "$restart_nginx" != "true" ]]; then
+	systemctl enable --now nginx || true
 fi
 
 log "Nginx installation complete."

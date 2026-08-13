@@ -28,17 +28,17 @@ install_java8_runtime
 configure_java_home_profile
 
 log "Installing Tomcat (preferred package: tomcat9)"
-apt-get update
+dnf makecache
 
-if apt-cache show tomcat9 >/dev/null 2>&1; then
-	apt-get install -y tomcat9
+if dnf info tomcat >/dev/null 2>&1; then
+	dnf install -y tomcat
 	if command -v systemctl >/dev/null 2>&1; then
 		systemctl daemon-reload || true
-		systemctl enable --now tomcat9 || true
+		systemctl enable --now tomcat || true
 	fi
-	SERVICE_NAME="tomcat9"
+	SERVICE_NAME="tomcat"
 else
-	log "Package tomcat9 is unavailable. Installing Apache Tomcat 9 manually."
+	log "Package tomcat is unavailable. Installing Apache Tomcat 9 manually."
 	TOMCAT_VERSION="${TOMCAT_VERSION:-9.0.108}"
 	TOMCAT_USER="tomcat"
 	TOMCAT_DIR="/opt/tomcat"
@@ -47,7 +47,7 @@ else
 	TMP_DIR="$(mktemp -d)"
 	trap 'rm -rf "$TMP_DIR"' EXIT
 
-	apt-get install -y curl tar
+	dnf install -y curl tar
 
 	if ! id -u "$TOMCAT_USER" >/dev/null 2>&1; then
 		useradd -r -m -U -d /opt/tomcat -s /bin/false "$TOMCAT_USER"

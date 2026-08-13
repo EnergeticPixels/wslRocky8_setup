@@ -21,9 +21,16 @@ fi
 # shellcheck source=/dev/null
 source "$REDIS_LIB"
 
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
 install_redis_packages() {
-	apt-get update
-	apt-get install -y redis-server redis-tools
+	dnf makecache
+	dnf install -y redis
 }
 
 redis_install_main() {
@@ -50,14 +57,14 @@ redis_install_main() {
 	fi
 
 	if [[ -n "$REDIS_VERSION" && -n "${installed_redis_version:-}" && "$installed_redis_version" != "$REDIS_VERSION" ]]; then
-		log "Requested REDIS_VERSION=$REDIS_VERSION differs from installed version=$installed_redis_version (apt repository availability determines installable version)."
+		log "Requested REDIS_VERSION=$REDIS_VERSION differs from installed version=$installed_redis_version (repository availability determines installable version)."
 	fi
 
 	log "Ensuring Redis service is running..."
 	start_redis_service
 
 	if grep -qi microsoft /proc/version 2>/dev/null && [[ ! -d /run/systemd/system ]]; then
-		log "WSL detected without systemd. You may need to start Redis manually in new sessions: sudo service redis-server start"
+		log "WSL detected without systemd. You may need to start Redis manually in new sessions: sudo service redis start"
 	fi
 
 	if command -v redis-cli >/dev/null 2>&1; then

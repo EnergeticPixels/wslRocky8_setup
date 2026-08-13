@@ -66,6 +66,7 @@ load_web_stack_env() {
 	WEB_SSL_BASE_DOMAIN="${WEB_SSL_BASE_DOMAIN:-app.local}"
 	WEB_SSL_CERT_EXPIRY="${WEB_SSL_CERT_EXPIRY:-1y}"
 	WEB_SSL_FORCE_HTTPS_REDIRECT="${WEB_SSL_FORCE_HTTPS_REDIRECT:-true}"
+	PHP_FPM_SERVICE_NAME="php-fpm"
 
 	case "$(printf '%s' "$PHP_ENABLE" | tr '[:upper:]' '[:lower:]')" in
 		1|true|yes|y|on)
@@ -144,6 +145,7 @@ load_web_stack_env() {
 	export WEB_SSL_BASE_DOMAIN
 	export WEB_SSL_CERT_EXPIRY
 	export WEB_SSL_FORCE_HTTPS_REDIRECT
+	export PHP_FPM_SERVICE_NAME
 }
 
 web_ssl_is_enabled() {
@@ -205,7 +207,7 @@ get_php_database_driver_extensions() {
 
 	case "$effective_mode" in
 		mysql)
-			echo "mysql"
+			echo "mysqlnd"
 			;;
 		postgres)
 			echo "pgsql"
@@ -285,7 +287,7 @@ build_php_extension_package_list() {
 		if [[ -z "${seen[$candidate]:-}" ]]; then
 			seen[$candidate]=1
 			PHP_EXTENSION_NAMES+=("$candidate")
-			extension_package="php${PHP_VERSION}-${candidate}"
+			extension_package="php-${candidate}"
 			PHP_EXTENSION_PACKAGES+=("$extension_package")
 		fi
 	done
@@ -296,8 +298,8 @@ filter_php_extension_packages_by_availability() {
 	local -a installable_packages=() installable_extensions=() missing_packages=() missing_extensions=()
 
 	for package_name in "${PHP_EXTENSION_PACKAGES[@]}"; do
-		candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
-		extension_name="${package_name#php${PHP_VERSION}-}"
+		candidate="$(dnf info "$package_name" 2>/dev/null | awk -F': ' '/^Version[[:space:]]*:/ {print $2; exit}')"
+		extension_name="${package_name#php-}"
 
 		if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
 			missing_packages+=("$package_name")
@@ -336,63 +338,43 @@ install_versioned_php_extensions() {
 		return 0
 	fi
 
-	apt-get install -y "${PHP_EXTENSION_PACKAGES[@]}"
+	dnf install -y "${PHP_EXTENSION_PACKAGES[@]}"
 }
 
 php_is_enabled() {
 	[[ "$PHP_ENABLE" == "true" ]]
 }
 
-ensure_sury_php_repo() {
-	local keyring repo_file codename
-	keyring="/usr/share/keyrings/debsuryorg-archive-keyring.gpg"
-	repo_file="/etc/apt/sources.list.d/php.list"
-	codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
-
-	if [[ -z "$codename" ]]; then
-		echo "Unable to determine Debian codename for Sury repository setup." >&2
-		exit 1
+ensure_remi_php_repo() {
+	if ! rpm -q epel-release >/dev/null 2>&1; then
+		dnf install -y epel-release
 	fi
 
-	if [[ ! -f "$keyring" ]]; then
-		log "Installing Sury PHP repository keyring."
-		apt-get install -y ca-certificates curl gnupg2
-		mkdir -p /usr/share/keyrings
-		curl -fsSL https://packages.sury.org/php/apt.gpg | gpg --dearmor -o "$keyring"
+	if ! rpm -q remi-release >/dev/null 2>&1; then
+		dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-8.rpm"
 	fi
 
-	if [[ ! -f "$repo_file" ]] || ! grep -q "packages.sury.org/php" "$repo_file"; then
-		log "Adding Sury PHP repository for Debian codename: $codename"
-		echo "deb [signed-by=$keyring] https://packages.sury.org/php/ $codename main" > "$repo_file"
-	fi
-
-	apt-get update
+	dnf install -y dnf-plugins-core
 }
 
 ensure_php_package_source() {
-	local package_name candidate
-	package_name="php${PHP_VERSION}-fpm"
-	apt-get update
-	candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
+	local stream
+	stream="remi-${PHP_VERSION}"
 
-	if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-		log "Package $package_name not found in current apt sources. Falling back to Sury PHP repository."
-		ensure_sury_php_repo
-		candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
-	fi
+	ensure_remi_php_repo
+	dnf -qy module reset php || true
+	dnf -qy module enable "php:${stream}"
+	dnf makecache
 
-	if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-		echo "Unable to find package $package_name after configuring repositories." >&2
+	if ! dnf info php-fpm >/dev/null 2>&1; then
+		echo "Unable to find php-fpm after configuring remi stream $stream." >&2
 		exit 1
 	fi
 }
 
 install_versioned_php_packages() {
-	local version_prefix
-	version_prefix="php${PHP_VERSION}"
-
-	apt-get install -y \
-		"${version_prefix}-fpm" \
-		"${version_prefix}-cli" \
-		"${version_prefix}-common"
+	dnf install -y \
+		php-fpm \
+		php-cli \
+		php-common
 }

@@ -17,18 +17,25 @@ fi
 # shellcheck source=/dev/null
 source "$PYTHON_LIB"
 
-run_apt_get() {
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
+run_pkg_manager() {
 	if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-		apt-get "$@"
+		dnf "$@"
 		return
 	fi
 
 	if command -v sudo >/dev/null 2>&1; then
-		sudo apt-get "$@"
+		sudo dnf "$@"
 		return
 	fi
 
-	echo "Error: apt-get requires root privileges. Re-run via sudo or install sudo." >&2
+	echo "Error: dnf requires root privileges. Re-run via sudo or install sudo." >&2
 	exit 1
 }
 
@@ -45,10 +52,7 @@ maybe_mask_binfmt_on_wsl() {
 		return
 	fi
 
-	if command -v systemctl >/dev/null 2>&1; then
-		log "WSL detected: masking systemd-binfmt.service to avoid known apt trigger failures"
-		systemctl mask systemd-binfmt.service >/dev/null 2>&1 || true
-	fi
+	return 0
 }
 
 main() {
@@ -66,44 +70,46 @@ main() {
 	log "Data Science Stack: $PYTHON_DATA_SCIENCE_STACK_ENABLE"
 	log "Dev Mode: $PYTHON_DEV_MODE"
 	PYTHON_VENV_PATH="${PYTHON_VENV_PATH:-$HOME/.venvs/initprov-python}"
-	local apt_phase_complete="${PYTHON_APT_PHASE_COMPLETE:-0}"
+	local pkg_phase_complete="${PYTHON_PKG_PHASE_COMPLETE:-0}"
 	local reexec_as_user="${PYTHON_REEXEC_AS_USER:-0}"
 	local target_user="${SUDO_USER:-}"
 
-	if [[ "${EUID:-$(id -u)}" -eq 0 && "$apt_phase_complete" != "1" ]]; then
+	if [[ "${EUID:-$(id -u)}" -eq 0 && "$pkg_phase_complete" != "1" ]]; then
 		maybe_mask_binfmt_on_wsl
 
-		# Update package lists
-		run_apt_get update
+		# Refresh package metadata
+		run_pkg_manager makecache
 
 		# Install base Python packages
 		log "Installing base Python packages..."
-		run_apt_get install -y \
+		run_pkg_manager install -y \
 			python3 \
 			python3-pip \
-			python3-venv \
 			python3-dev \
-			build-essential
+			gcc \
+			gcc-c++ \
+			make
 
 		if [[ -n "$target_user" && "$target_user" != "root" && "$reexec_as_user" != "1" ]]; then
 			log "Continuing Python package setup as user $target_user"
-			exec sudo -u "$target_user" -H env PYTHON_APT_PHASE_COMPLETE=1 PYTHON_REEXEC_AS_USER=1 bash "$0"
+			exec sudo -u "$target_user" -H env PYTHON_PKG_PHASE_COMPLETE=1 PYTHON_REEXEC_AS_USER=1 bash "$0"
 		fi
 	fi
 
-	if [[ "$apt_phase_complete" != "1" && "${EUID:-$(id -u)}" -ne 0 ]]; then
+	if [[ "$pkg_phase_complete" != "1" && "${EUID:-$(id -u)}" -ne 0 ]]; then
 		# Standalone non-root execution path.
-		run_apt_get update
+		run_pkg_manager makecache
 		log "Installing base Python packages..."
-		run_apt_get install -y \
+		run_pkg_manager install -y \
 			python3 \
 			python3-pip \
-			python3-venv \
 			python3-dev \
-			build-essential
+			gcc \
+			gcc-c++ \
+			make
 	fi
 
-	# Use an isolated virtual environment to comply with Debian's PEP 668 policy.
+	# Use an isolated virtual environment to keep Python tooling isolated.
 	if [[ ! -d "$PYTHON_VENV_PATH" ]]; then
 		log "Creating Python virtual environment at $PYTHON_VENV_PATH"
 		mkdir -p "$(dirname "$PYTHON_VENV_PATH")"

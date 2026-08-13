@@ -7,11 +7,11 @@ if ! command -v log >/dev/null 2>&1; then
 	}
 fi
 
-APACHE_SSL_DIR="/etc/apache2/ssl"
+APACHE_SSL_DIR="/etc/httpd/ssl"
 APACHE_SSL_CERT_FILE="$APACHE_SSL_DIR/serverprovo-local.crt"
 APACHE_SSL_KEY_FILE="$APACHE_SSL_DIR/serverprovo-local.key"
 APACHE_SSL_DOMAINS_FILE="$APACHE_SSL_DIR/serverprovo-domains.txt"
-APACHE_SSL_SITE_FILE="/etc/apache2/sites-available/serverprovo-ssl.conf"
+APACHE_SSL_SITE_FILE="/etc/httpd/conf.d/serverprovo-ssl.conf"
 APACHE_SSL_RENEW_THRESHOLD_SECONDS=$((30 * 86400))
 
 normalize_domain_local() {
@@ -58,8 +58,8 @@ apache_ssl_install_mkcert_if_needed() {
 	fi
 
 	log "Installing mkcert for local development certificates."
-	apt-get update
-	apt-get install -y mkcert
+	dnf install -y epel-release
+	dnf install -y mkcert
 }
 
 apache_ssl_backup_existing_artifacts() {
@@ -145,10 +145,10 @@ apache_ssl_generate_certificate() {
 		mkcert -install
 		mkcert -cert-file "$APACHE_SSL_CERT_FILE" -key-file "$APACHE_SSL_KEY_FILE" "${mkcert_domains[@]}"
 		chmod 640 "$APACHE_SSL_CERT_FILE" "$APACHE_SSL_KEY_FILE"
-		chown root:www-data "$APACHE_SSL_CERT_FILE" "$APACHE_SSL_KEY_FILE"
+		chown root:apache "$APACHE_SSL_CERT_FILE" "$APACHE_SSL_KEY_FILE"
 		apache_ssl_domains_san_string "$base_domain" > "$APACHE_SSL_DOMAINS_FILE"
 		chmod 640 "$APACHE_SSL_DOMAINS_FILE"
-		chown root:www-data "$APACHE_SSL_DOMAINS_FILE"
+		chown root:apache "$APACHE_SSL_DOMAINS_FILE"
 	else
 		log "Existing Apache SSL certificate is still valid and matches configured domains; skipping regeneration."
 	fi
@@ -170,17 +170,15 @@ apache_ssl_write_vhost() {
         SSLCertificateFile $APACHE_SSL_CERT_FILE
         SSLCertificateKeyFile $APACHE_SSL_KEY_FILE
 
-		ErrorLog \${APACHE_LOG_DIR}/serverprovo-ssl-error.log
-		CustomLog \${APACHE_LOG_DIR}/serverprovo-ssl-access.log combined
+		ErrorLog /var/log/httpd/serverprovo-ssl-error.log
+		CustomLog /var/log/httpd/serverprovo-ssl-access.log combined
     </VirtualHost>
 </IfModule>
 EOF
 }
 
 apache_ssl_enable_in_apache() {
-	a2enmod ssl >/dev/null
-	a2ensite serverprovo-ssl >/dev/null
-	apache2ctl configtest
+	httpd -t
 }
 
 apache_ssl_setup() {

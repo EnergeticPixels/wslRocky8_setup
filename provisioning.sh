@@ -25,6 +25,7 @@ BASE_PACKAGES=(
 	make
 	openssl-devel
 	dnf-plugins-core
+	epel-release
 	ripgrep
 )
 
@@ -67,6 +68,22 @@ require_env_file() {
 
 require_supported_platform() {
 	sp_require_rocky8 || exit 1
+}
+
+ensure_wizard_prerequisites() {
+	if command -v rg >/dev/null 2>&1; then
+		return 0
+	fi
+
+	if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+		fail "Missing required command 'rg' (ripgrep). Install it first or run wizard with sudo."
+	fi
+
+	log "Installing missing prerequisite package: ripgrep (enabling EPEL first)"
+	dnf install -y epel-release || true
+	if ! dnf install -y ripgrep; then
+		fail "ripgrep installation failed. Ensure EPEL is enabled and repositories are reachable, then retry."
+	fi
 }
 
 validate_env_key() {
@@ -537,6 +554,7 @@ wizard() {
 wizard_command() {
 	local proceed
 	require_supported_platform
+	ensure_wizard_prerequisites
 
 	while true; do
 		wizard

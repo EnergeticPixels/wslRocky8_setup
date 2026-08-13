@@ -131,62 +131,43 @@ validate_jar_inputs() {
 }
 
 ensure_adoptium_repo() {
-	local keyring repo_file codename
-	keyring="/usr/share/keyrings/adoptium.gpg"
-	repo_file="/etc/apt/sources.list.d/adoptium.list"
-	codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-}")"
-
-	if [[ -z "$codename" ]]; then
-		echo "Unable to determine Debian codename for Adoptium repository setup." >&2
-		exit 1
-	fi
-
-	if [[ ! -f "$keyring" ]]; then
-		log "Installing Adoptium repository keyring."
-		apt-get install -y ca-certificates curl gnupg2
-		mkdir -p /usr/share/keyrings
-		curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o "$keyring"
-	fi
+	local repo_file
+	repo_file="/etc/yum.repos.d/adoptium.repo"
 
 	if [[ ! -f "$repo_file" ]] || ! grep -q "packages.adoptium.net" "$repo_file"; then
-		log "Adding Adoptium repository for Debian codename: $codename"
-		echo "deb [signed-by=$keyring] https://packages.adoptium.net/artifactory/deb $codename main" > "$repo_file"
+		log "Adding Adoptium repository for Rocky 8."
+		cat > "$repo_file" <<'EOF'
+[Adoptium]
+name=Adoptium
+baseurl=https://packages.adoptium.net/artifactory/rpm/centos/8/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public
+EOF
 	fi
 
-	apt-get update
+	dnf makecache
 }
 
 install_java8_runtime() {
-	local package_name candidate
+	local package_name
 
 	validate_java_version
 	validate_java_distro
-	apt-get update
+	dnf makecache
 
 	if [[ "$JAVA_DISTRO" == "openjdk" ]]; then
-		package_name="openjdk-8-jdk"
-		candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
-		if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-			echo "Package $package_name is unavailable in current apt sources. Use JAVA_DISTRO=temurin on Debian 13." >&2
-			exit 1
-		fi
+		package_name="java-1.8.0-openjdk-devel"
 	else
 		package_name="temurin-8-jdk"
-		candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
-		if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-			log "Package $package_name not found in current apt sources. Configuring Adoptium repository."
+		if ! dnf info "$package_name" >/dev/null 2>&1; then
+			log "Package $package_name not found in current dnf sources. Configuring Adoptium repository."
 			ensure_adoptium_repo
-			candidate="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2}')"
-		fi
-
-		if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-			echo "Unable to find package $package_name after configuring repositories." >&2
-			exit 1
 		fi
 	fi
 
 	log "Installing Java runtime package: $package_name"
-	apt-get install -y "$package_name"
+	dnf install -y "$package_name"
 }
 
 configure_java_home_profile() {

@@ -11,11 +11,11 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
 fi
 
 log "Ensuring vim is installed"
-apt-get install -y vim
+dnf install -y vim
 
 log "Setting vim as the system default editor"
-update-alternatives --set editor /usr/bin/vim.basic 2>/dev/null || \
-	update-alternatives --install /usr/bin/editor editor /usr/bin/vim 50
+alternatives --set editor /usr/bin/vim 2>/dev/null || \
+	alternatives --install /usr/bin/editor editor /usr/bin/vim 50
 
 # Persist EDITOR and VISUAL for login shells system-wide.
 PROFILE_FILE="/etc/profile.d/editor.sh"

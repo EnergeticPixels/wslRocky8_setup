@@ -21,45 +21,69 @@ fi
 # shellcheck source=/dev/null
 source "$DATABASE_LIB"
 
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
+POSTGRES_SERVICE_NAME="postgresql"
+
 service_start() {
 	if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
 		systemctl daemon-reload || true
-		systemctl enable postgresql || true
-		systemctl start postgresql
+		systemctl enable "$POSTGRES_SERVICE_NAME" || true
+		systemctl start "$POSTGRES_SERVICE_NAME"
 	else
-		service postgresql start
+		service "$POSTGRES_SERVICE_NAME" start
 	fi
 }
 
 service_status() {
 	if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
-		systemctl status postgresql --no-pager || true
+		systemctl status "$POSTGRES_SERVICE_NAME" --no-pager || true
 	else
-		service postgresql status || true
+		service "$POSTGRES_SERVICE_NAME" status || true
 	fi
 }
 
 postgresql_server_installed() {
-	if dpkg-query -W -f='${Status}' "postgresql-$POSTGRESQL_VERSION" 2>/dev/null | grep -q "install ok installed"; then
+	rpm -q "postgresql${POSTGRESQL_VERSION}-server" >/dev/null 2>&1 || rpm -q postgresql-server >/dev/null 2>&1
+}
+
+configure_postgresql_repo_if_needed() {
+	if rpm -q pgdg-redhat-repo >/dev/null 2>&1; then
 		return 0
 	fi
 
-	dpkg-query -W -f='${Status}' postgresql 2>/dev/null | grep -q "install ok installed"
+	log "Installing PGDG repository for versioned PostgreSQL packages."
+	dnf install -y "https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+	dnf -qy module disable postgresql || true
 }
 
 install_postgresql_packages() {
 	local versioned_server_pkg versioned_client_pkg
-	versioned_server_pkg="postgresql-$POSTGRESQL_VERSION"
-	versioned_client_pkg="postgresql-client-$POSTGRESQL_VERSION"
+	versioned_server_pkg="postgresql${POSTGRESQL_VERSION}-server"
+	versioned_client_pkg="postgresql${POSTGRESQL_VERSION}"
 
-	apt-get update
+	dnf makecache
 
-	if apt-cache show "$versioned_server_pkg" >/dev/null 2>&1; then
+	configure_postgresql_repo_if_needed
+
+	if dnf info "$versioned_server_pkg" >/dev/null 2>&1; then
 		log "Installing PostgreSQL packages: $versioned_server_pkg, $versioned_client_pkg"
-		apt-get install -y "$versioned_server_pkg" "$versioned_client_pkg"
+		dnf install -y "$versioned_server_pkg" "$versioned_client_pkg"
+		POSTGRES_SERVICE_NAME="postgresql-${POSTGRESQL_VERSION}"
+
+		if [[ -x "/usr/pgsql-${POSTGRESQL_VERSION}/bin/postgresql-${POSTGRESQL_VERSION}-setup" ]]; then
+			"/usr/pgsql-${POSTGRESQL_VERSION}/bin/postgresql-${POSTGRESQL_VERSION}-setup" initdb || true
+		fi
 	else
-		log "Package $versioned_server_pkg not found in current apt sources. Installing default PostgreSQL packages instead."
-		apt-get install -y postgresql postgresql-client
+		log "Package $versioned_server_pkg not found in current dnf sources. Installing default PostgreSQL packages instead."
+		dnf install -y postgresql-server postgresql
+		POSTGRES_SERVICE_NAME="postgresql"
+		postgresql-setup --initdb || true
 	fi
 }
 

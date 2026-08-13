@@ -57,23 +57,23 @@ redis_is_enabled() {
 }
 
 redis_server_installed() {
-	dpkg-query -W -f='${Status}' redis-server 2>/dev/null | grep -q "install ok installed"
+	rpm -q redis >/dev/null 2>&1
 }
 
 start_redis_service() {
 	if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
 		systemctl daemon-reload || true
-		systemctl enable redis-server || true
-		systemctl start redis-server
+		systemctl enable redis || true
+		systemctl start redis
 	else
-		service redis-server start
+		service redis start
 	fi
 }
 
 show_redis_service_status() {
 	if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
-		systemctl status redis-server --no-pager || true
+		systemctl status redis --no-pager || true
 	else
-		service redis-server status || true
+		service redis status || true
 	fi
 }

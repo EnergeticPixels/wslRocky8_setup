@@ -11,8 +11,7 @@ NGINX_SSL_DIR="/etc/nginx/ssl"
 NGINX_SSL_CERT_FILE="$NGINX_SSL_DIR/serverprovo-local.crt"
 NGINX_SSL_KEY_FILE="$NGINX_SSL_DIR/serverprovo-local.key"
 NGINX_SSL_DOMAINS_FILE="$NGINX_SSL_DIR/serverprovo-domains.txt"
-NGINX_SSL_SITE_FILE="/etc/nginx/sites-available/serverprovo-ssl.conf"
-NGINX_SSL_ENABLED_FILE="/etc/nginx/sites-enabled/serverprovo-ssl.conf"
+NGINX_SSL_SITE_FILE="/etc/nginx/conf.d/serverprovo-ssl.conf"
 NGINX_SSL_RENEW_THRESHOLD_SECONDS=$((30 * 86400))
 
 normalize_domain_local() {
@@ -59,8 +58,8 @@ nginx_ssl_install_mkcert_if_needed() {
 	fi
 
 	log "Installing mkcert for local development certificates."
-	apt-get update
-	apt-get install -y mkcert
+	dnf install -y epel-release
+	dnf install -y mkcert
 }
 
 nginx_ssl_backup_existing_artifacts() {
@@ -146,10 +145,10 @@ nginx_ssl_generate_certificate() {
 		mkcert -install
 		mkcert -cert-file "$NGINX_SSL_CERT_FILE" -key-file "$NGINX_SSL_KEY_FILE" "${mkcert_domains[@]}"
 		chmod 640 "$NGINX_SSL_CERT_FILE" "$NGINX_SSL_KEY_FILE"
-		chown root:www-data "$NGINX_SSL_CERT_FILE" "$NGINX_SSL_KEY_FILE"
+		chown root:nginx "$NGINX_SSL_CERT_FILE" "$NGINX_SSL_KEY_FILE"
 		nginx_ssl_domains_san_string "$base_domain" > "$NGINX_SSL_DOMAINS_FILE"
 		chmod 640 "$NGINX_SSL_DOMAINS_FILE"
-		chown root:www-data "$NGINX_SSL_DOMAINS_FILE"
+		chown root:nginx "$NGINX_SSL_DOMAINS_FILE"
 	else
 		log "Existing Nginx SSL certificate is still valid and matches configured domains; skipping regeneration."
 	fi
@@ -178,7 +177,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.php index.html index.htm index.nginx-debian.html;
+	index index.php index.html index.htm;
 
 	ssl_certificate $NGINX_SSL_CERT_FILE;
 	ssl_certificate_key $NGINX_SSL_KEY_FILE;
@@ -198,7 +197,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.php index.html index.htm index.nginx-debian.html;
+	index index.php index.html index.htm;
 
 	location / {
 		try_files \$uri \$uri/ =404;
@@ -214,7 +213,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.php index.html index.htm index.nginx-debian.html;
+	index index.php index.html index.htm;
 
 	ssl_certificate $NGINX_SSL_CERT_FILE;
 	ssl_certificate_key $NGINX_SSL_KEY_FILE;
@@ -245,7 +244,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.html index.htm index.nginx-debian.html;
+	index index.html index.htm;
 
 	ssl_certificate $NGINX_SSL_CERT_FILE;
 	ssl_certificate_key $NGINX_SSL_KEY_FILE;
@@ -263,7 +262,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.html index.htm index.nginx-debian.html;
+	index index.html index.htm;
 
 	location / {
 		try_files \$uri \$uri/ =404;
@@ -277,7 +276,7 @@ server {
 	server_name $base_domain *.$base_domain;
 
 	root /var/www/html;
-	index index.html index.htm index.nginx-debian.html;
+	index index.html index.htm;
 
 	ssl_certificate $NGINX_SSL_CERT_FILE;
 	ssl_certificate_key $NGINX_SSL_KEY_FILE;
@@ -292,7 +291,6 @@ EOF
 }
 
 nginx_ssl_enable_in_nginx() {
-	ln -sfn "$NGINX_SSL_SITE_FILE" "$NGINX_SSL_ENABLED_FILE"
 	nginx -t
 }
 

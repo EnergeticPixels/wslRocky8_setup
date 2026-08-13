@@ -31,8 +31,29 @@ fi
 # shellcheck source=/dev/null
 source "$APACHE_SSL_LIB"
 
-log "Installing Apache web server (apache2)."
-apt-get install -y apache2
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
+configure_apache_php_fpm() {
+	local php_socket conf_file
+	php_socket="/run/php-fpm/www.sock"
+	conf_file="/etc/httpd/conf.d/php-fpm.conf"
+
+	cat > "$conf_file" <<EOF
+<FilesMatch \.php$>
+    SetHandler "proxy:unix:${php_socket}|fcgi://localhost"
+</FilesMatch>
+
+DirectoryIndex index.php index.html
+EOF
+}
+
+log "Installing Apache web server (httpd)."
+dnf install -y httpd mod_ssl
 
 if php_is_enabled; then
 	validate_php_version
@@ -40,12 +61,12 @@ if php_is_enabled; then
 	install_versioned_php_packages
 	resolve_php_extension_packages
 	install_versioned_php_extensions
+	configure_apache_php_fpm
 
 	log "Configuring Apache for php-fpm version $PHP_VERSION."
-	a2enmod proxy_fcgi setenvif
-	a2enconf "php${PHP_VERSION}-fpm"
-	systemctl enable --now "php${PHP_VERSION}-fpm"
-	systemctl restart apache2
+	systemctl enable --now "$PHP_FPM_SERVICE_NAME"
+	systemctl enable --now httpd
+	systemctl restart httpd
 	log "Apache configured with php-fpm version $PHP_VERSION."
 else
 	log "PHP installation disabled by PHP_ENABLE=false."
@@ -54,10 +75,14 @@ fi
 if web_ssl_is_enabled; then
 	log "WEB_SSL_ENABLE=true. Configuring Apache SSL via mkcert for base domain: $WEB_SSL_BASE_DOMAIN"
 	apache_ssl_setup "$WEB_SSL_BASE_DOMAIN"
-	systemctl restart apache2
+	systemctl restart httpd
 	log "Apache SSL provisioning complete."
 else
 	log "Apache SSL provisioning disabled by WEB_SSL_ENABLE=false."
+fi
+
+if ! php_is_enabled; then
+	systemctl enable --now httpd || true
 fi
 
 log "Apache installation complete."

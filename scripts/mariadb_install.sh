@@ -21,6 +21,13 @@ fi
 # shellcheck source=/dev/null
 source "$DATABASE_LIB"
 
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
 mariadb_install_main() {
 	load_database_env
 
@@ -39,8 +46,8 @@ mariadb_install_main() {
 		log "Using existing MariaDB installation."
 	else
 		log "Installing MariaDB server (version $MARIADB_VERSION)..."
-		apt-get update
-		apt-get install -y mariadb-server mariadb-client
+		dnf makecache
+		dnf install -y mariadb-server mariadb
 
 		log "Enabling and starting MariaDB service..."
 		systemctl daemon-reload

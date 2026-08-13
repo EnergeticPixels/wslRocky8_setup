@@ -23,6 +23,7 @@ BASE_PACKAGES=(
 	make
 	openssl-devel
 	dnf-plugins-core
+	epel-release
 	ripgrep
 )
 

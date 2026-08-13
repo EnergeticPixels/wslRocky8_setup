@@ -21,6 +21,13 @@ fi
 # shellcheck source=/dev/null
 source "$DATABASE_LIB"
 
+PLATFORM_LIB="$SCRIPT_DIR/lib/platform.sh"
+if [[ -f "$PLATFORM_LIB" ]]; then
+	# shellcheck source=/dev/null
+	source "$PLATFORM_LIB"
+	sp_require_rocky8
+fi
+
 service_start() {
 	if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
 		systemctl daemon-reload || true
@@ -68,52 +75,27 @@ wait_for_mongodb_ready() {
 }
 
 mongodb_server_installed() {
-	dpkg-query -W -f='${Status}' mongodb-org 2>/dev/null | grep -q "install ok installed"
+	rpm -q mongodb-org >/dev/null 2>&1
 }
 
-resolve_mongodb_repo_codename() {
-	local os_codename
-	os_codename="$(. /etc/os-release && printf '%s' "${VERSION_CODENAME:-}")"
+configure_mongodb_yum_repo() {
+	local repo_file
+	repo_file="/etc/yum.repos.d/mongodb-org-${MONGODB_VERSION}.repo"
 
-	case "$os_codename" in
-		bookworm|bullseye)
-			printf '%s' "$os_codename"
-			;;
-		trixie)
-			log "Debian codename '$os_codename' detected. Using MongoDB bookworm repository compatibility fallback." >&2
-			printf '%s' "bookworm"
-			;;
-		*)
-			log "Unknown Debian codename '$os_codename'. Using MongoDB bookworm repository compatibility fallback." >&2
-			printf '%s' "bookworm"
-			;;
-	esac
-}
-
-configure_mongodb_apt_repo() {
-	local keyring_path repo_codename source_list
-	keyring_path="/usr/share/keyrings/mongodb-server-${MONGODB_VERSION}.gpg"
-	source_list="/etc/apt/sources.list.d/mongodb-org-${MONGODB_VERSION}.list"
-	repo_codename="$(resolve_mongodb_repo_codename)"
-
-	# Clear any stale/invalid MongoDB source file from prior failed runs before refreshing apt indexes.
-	rm -f "$source_list"
-
-	apt-get update
-	apt-get install -y curl gnupg ca-certificates
-
-	curl -fsSL "https://pgp.mongodb.com/server-${MONGODB_VERSION}.asc" | \
-		gpg --dearmor -o "$keyring_path"
-
-	cat > "$source_list" <<EOF
-deb [signed-by=$keyring_path] https://repo.mongodb.org/apt/debian ${repo_codename}/mongodb-org/${MONGODB_VERSION} main
+	cat > "$repo_file" <<EOF
+[mongodb-org-${MONGODB_VERSION}]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/8/mongodb-org/${MONGODB_VERSION}/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://pgp.mongodb.com/server-${MONGODB_VERSION}.asc
 EOF
 }
 
 install_mongodb_packages() {
-	configure_mongodb_apt_repo
-	apt-get update
-	apt-get install -y mongodb-org
+	configure_mongodb_yum_repo
+	dnf makecache
+	dnf install -y mongodb-org
 }
 
 json_escape() {
