@@ -211,7 +211,8 @@ validate_php_extension_name() {
 get_php_baseline_extensions() {
 	case "$PHP_EXTENSIONS_BASELINE" in
 		common)
-			echo "mbstring xml curl zip intl gd bcmath opcache readline"
+			# Keep baseline to extensions that map to available Rocky/Remi php-* packages.
+			echo "mbstring xml intl gd bcmath opcache"
 			;;
 		none)
 			echo ""
@@ -312,14 +313,13 @@ build_php_extension_package_list() {
 }
 
 filter_php_extension_packages_by_availability() {
-	local package_name candidate extension_name
+	local package_name extension_name
 	local -a installable_packages=() installable_extensions=() missing_packages=() missing_extensions=()
 
 	for package_name in "${PHP_EXTENSION_PACKAGES[@]}"; do
-		candidate="$(dnf info "$package_name" 2>/dev/null | awk -F': ' '/^Version[[:space:]]*:/ {print $2; exit}')"
 		extension_name="${package_name#php-}"
 
-		if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
+		if ! dnf info "$package_name" >/dev/null 2>&1; then
 			missing_packages+=("$package_name")
 			missing_extensions+=("$extension_name")
 		else

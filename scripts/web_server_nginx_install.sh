@@ -38,6 +38,60 @@ if [[ -f "$PLATFORM_LIB" ]]; then
 	sp_require_rocky8
 fi
 
+systemd_is_available() {
+	command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]
+}
+
+start_nginx() {
+	if systemd_is_available; then
+		systemctl enable --now nginx
+		return 0
+	fi
+
+	if command -v nginx >/dev/null 2>&1; then
+		if pgrep -x nginx >/dev/null 2>&1; then
+			nginx -s reload || true
+		else
+			nginx
+		fi
+		log "Started Nginx via direct nginx command because systemd is unavailable in this session."
+		return 0
+	fi
+
+	echo "Unable to start Nginx automatically: neither active systemd nor nginx command is available." >&2
+	return 1
+}
+
+start_php_fpm() {
+	if systemd_is_available; then
+		systemctl enable --now "$PHP_FPM_SERVICE_NAME"
+		return 0
+	fi
+
+	log "Skipping automatic php-fpm service start because systemd is unavailable in this session."
+	return 0
+}
+
+stop_conflicting_apache() {
+	if ! pgrep -x httpd >/dev/null 2>&1; then
+		return 0
+	fi
+
+	log "Detected running Apache (httpd); stopping it to avoid port 80/443 conflict with Nginx."
+
+	if systemd_is_available; then
+		systemctl stop httpd || true
+		systemctl disable httpd || true
+		return 0
+	fi
+
+	if command -v httpd >/dev/null 2>&1; then
+		httpd -k stop || true
+	fi
+
+	pkill -x httpd >/dev/null 2>&1 || true
+}
+
 configure_nginx_php_fpm() {
 	local php_socket snippet_file default_d_file
 	php_socket="$PHP_FPM_SOCKET"
@@ -47,7 +101,9 @@ configure_nginx_php_fpm() {
 	mkdir -p /etc/nginx/snippets /etc/nginx/default.d
 	cat > "$snippet_file" <<EOF
 location ~ \.php$ {
-    include snippets/fastcgi-php.conf;
+	include fastcgi_params;
+	fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+	fastcgi_index index.php;
     fastcgi_pass unix:${php_socket};
 }
 
@@ -75,7 +131,7 @@ if php_is_enabled; then
 	configure_nginx_php_fpm
 
 	log "Configuring Nginx for php-fpm version $PHP_VERSION."
-	systemctl enable --now "$PHP_FPM_SERVICE_NAME"
+	start_php_fpm
 	restart_nginx=true
 	log "Nginx configured with php-fpm version $PHP_VERSION."
 else
@@ -93,13 +149,19 @@ fi
 
 if [[ "$restart_nginx" == "true" ]]; then
 	nginx -t
-	systemctl enable nginx || true
-	systemctl restart nginx
+	stop_conflicting_apache
+	if systemd_is_available; then
+		systemctl enable nginx || true
+		systemctl restart nginx
+	else
+		start_nginx
+	fi
 	log "Nginx service restarted with current configuration."
 fi
 
 if [[ "$restart_nginx" != "true" ]]; then
-	systemctl enable --now nginx || true
+	stop_conflicting_apache
+	start_nginx || true
 fi
 
 log "Nginx installation complete."

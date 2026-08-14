@@ -14,6 +14,24 @@ sudo service mariadb start
 sudo service redis start
 ```
 
+## firewalld and Windows host access
+
+This can affect both browser access from Windows and VS Code Remote WSL session stability.
+
+- If `firewalld` is active in WSL, host traffic from Windows can be blocked until rules are opened.
+- Enabling only `http` may still interrupt existing VS Code connectivity briefly when firewall rules are reloaded.
+
+`provisioning.sh run` now normalizes WSL firewall behavior by:
+
+- trusting the Windows host gateway IP in firewalld
+- allowing `http` and `https` on the active interface zone
+
+If you changed rules manually and connectivity looks odd, rerun:
+
+```bash
+sudo bash ./provisioning.sh run --only web
+```
+
 ## GPG terminal note
 
 If signed commits fail with `Inappropriate ioctl for device`:
