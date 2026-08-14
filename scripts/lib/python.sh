@@ -88,6 +88,8 @@ validate_python_dev_mode() {
 # Usage: pip_install_latest package_name [package_name ...]
 pip_install_latest() {
 	local packages=("$@")
+	local py_cmd
+	py_cmd="${PYTHON_CMD:-python3}"
 	
 	if (( ${#packages[@]} == 0 )); then
 		echo "Error: pip_install_latest requires at least one package name" >&2
@@ -95,17 +97,19 @@ pip_install_latest() {
 	fi
 
 	log "Installing Python packages: ${packages[*]} (latest versions)"
-	python3 -m pip install --upgrade "${packages[@]}"
+	"$py_cmd" -m pip install --upgrade "${packages[@]}"
 }
 
 # Verify a Python package can be imported
 # Usage: verify_python_package module_name
 verify_python_package() {
 	local module="$1"
+	local py_cmd
+	py_cmd="${PYTHON_CMD:-python3}"
 	
-	if python3 -c "import $module" 2>/dev/null; then
+	if "$py_cmd" -c "import $module" 2>/dev/null; then
 		local version
-		version=$(python3 -c "import $module; print(getattr($module, '__version__', 'unknown'))")
+		version=$("$py_cmd" -c "import $module; print(getattr($module, '__version__', 'unknown'))")
 		log "✓ $module installed (version: $version)"
 		return 0
 	else
@@ -118,5 +122,7 @@ verify_python_package() {
 # Usage: get_pip_package_version package_name
 get_pip_package_version() {
 	local package="$1"
-	python3 -m pip show "$package" 2>/dev/null | grep "^Version:" | cut -d' ' -f2
+	local py_cmd
+	py_cmd="${PYTHON_CMD:-python3}"
+	"$py_cmd" -m pip show "$package" 2>/dev/null | grep "^Version:" | cut -d' ' -f2
 }

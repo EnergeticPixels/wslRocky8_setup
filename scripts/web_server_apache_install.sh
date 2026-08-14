@@ -42,19 +42,50 @@ systemd_is_available() {
 	command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]
 }
 
+ensure_mod_ssl_default_certificates() {
+	local cert_file key_file
+
+	if [[ ! -f /etc/httpd/conf.d/ssl.conf ]]; then
+		return 0
+	fi
+
+	cert_file="/etc/pki/tls/certs/localhost.crt"
+	key_file="/etc/pki/tls/private/localhost.key"
+
+	if [[ -s "$cert_file" && -s "$key_file" ]]; then
+		return 0
+	fi
+
+	mkdir -p /etc/pki/tls/certs /etc/pki/tls/private
+	openssl req -x509 -nodes -newkey rsa:2048 \
+		-keyout "$key_file" \
+		-out "$cert_file" \
+		-days 365 \
+		-subj "/CN=localhost" >/dev/null 2>&1
+	chmod 600 "$key_file"
+	chmod 644 "$cert_file"
+	log "Created fallback localhost TLS cert/key for Apache mod_ssl default config."
+}
+
 start_httpd() {
+	ensure_mod_ssl_default_certificates
+
 	if systemd_is_available; then
 		systemctl enable --now httpd
 		return 0
 	fi
 
-	if command -v apachectl >/dev/null 2>&1; then
-		apachectl -k restart || apachectl -k start
-		log "Started httpd via apachectl because systemd is unavailable in this session."
+	if command -v httpd >/dev/null 2>&1; then
+		if pgrep -x httpd >/dev/null 2>&1; then
+			httpd -k graceful || true
+		else
+			httpd -k start
+		fi
+		log "Started httpd via direct httpd command because systemd is unavailable in this session."
 		return 0
 	fi
 
-	echo "Unable to start httpd automatically: neither active systemd nor apachectl is available." >&2
+	echo "Unable to start httpd automatically: neither active systemd nor httpd command is available." >&2
 	return 1
 }
 
@@ -66,6 +97,26 @@ start_php_fpm() {
 
 	log "Skipping automatic php-fpm service start because systemd is unavailable in this session."
 	return 0
+}
+
+stop_conflicting_nginx() {
+	if ! pgrep -x nginx >/dev/null 2>&1; then
+		return 0
+	fi
+
+	log "Detected running Nginx; stopping it to avoid port 80/443 conflict with Apache."
+
+	if systemd_is_available; then
+		systemctl stop nginx || true
+		systemctl disable nginx || true
+		return 0
+	fi
+
+	if command -v nginx >/dev/null 2>&1; then
+		nginx -s quit || true
+	fi
+
+	pkill -x nginx >/dev/null 2>&1 || true
 }
 
 configure_apache_php_fpm() {
@@ -95,6 +146,7 @@ if php_is_enabled; then
 
 	log "Configuring Apache for php-fpm version $PHP_VERSION."
 	start_php_fpm
+	stop_conflicting_nginx
 	start_httpd
 	if systemd_is_available; then
 		systemctl restart httpd
@@ -110,7 +162,7 @@ if web_ssl_is_enabled; then
 	if systemd_is_available; then
 		systemctl restart httpd
 	else
-		apachectl -k restart || apachectl -k start
+		httpd -k graceful || httpd -k start
 	fi
 	log "Apache SSL provisioning complete."
 else
@@ -118,6 +170,7 @@ else
 fi
 
 if ! php_is_enabled; then
+	stop_conflicting_nginx
 	start_httpd || true
 fi
 

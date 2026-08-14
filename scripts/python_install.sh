@@ -56,8 +56,26 @@ maybe_mask_binfmt_on_wsl() {
 }
 
 main() {
+	local python_pkg python_pip_pkg python_dev_pkg python_cmd
+	local pkg_phase_complete reexec_as_user target_user
+
 	load_python_env
 	validate_python_dev_mode
+
+	python_pkg="python3"
+	python_pip_pkg="python3-pip"
+	python_dev_pkg="python3-devel"
+	python_cmd="python3"
+
+	# Reflex requires a newer interpreter than Rocky's default python3 (3.6).
+	if [[ "$PYTHON_DEV_MODE" == "reflex" || "$PYTHON_DEV_MODE" == "both" ]]; then
+		python_pkg="python39"
+		python_pip_pkg="python39-pip"
+		python_dev_pkg="python39-devel"
+		python_cmd="python3.9"
+	fi
+
+	export PYTHON_CMD="$python_cmd"
 
 	# Early exit if Python is not enabled
 	if ! python_is_enabled; then
@@ -70,9 +88,9 @@ main() {
 	log "Data Science Stack: $PYTHON_DATA_SCIENCE_STACK_ENABLE"
 	log "Dev Mode: $PYTHON_DEV_MODE"
 	PYTHON_VENV_PATH="${PYTHON_VENV_PATH:-$HOME/.venvs/initprov-python}"
-	local pkg_phase_complete="${PYTHON_PKG_PHASE_COMPLETE:-0}"
-	local reexec_as_user="${PYTHON_REEXEC_AS_USER:-0}"
-	local target_user="${SUDO_USER:-}"
+	pkg_phase_complete="${PYTHON_PKG_PHASE_COMPLETE:-0}"
+	reexec_as_user="${PYTHON_REEXEC_AS_USER:-0}"
+	target_user="${SUDO_USER:-}"
 
 	if [[ "${EUID:-$(id -u)}" -eq 0 && "$pkg_phase_complete" != "1" ]]; then
 		maybe_mask_binfmt_on_wsl
@@ -83,9 +101,9 @@ main() {
 		# Install base Python packages
 		log "Installing base Python packages..."
 		run_pkg_manager install -y \
-			python3 \
-			python3-pip \
-			python3-dev \
+			"$python_pkg" \
+			"$python_pip_pkg" \
+			"$python_dev_pkg" \
 			gcc \
 			gcc-c++ \
 			make
@@ -101,9 +119,9 @@ main() {
 		run_pkg_manager makecache
 		log "Installing base Python packages..."
 		run_pkg_manager install -y \
-			python3 \
-			python3-pip \
-			python3-dev \
+			"$python_pkg" \
+			"$python_pip_pkg" \
+			"$python_dev_pkg" \
 			gcc \
 			gcc-c++ \
 			make
@@ -113,7 +131,7 @@ main() {
 	if [[ ! -d "$PYTHON_VENV_PATH" ]]; then
 		log "Creating Python virtual environment at $PYTHON_VENV_PATH"
 		mkdir -p "$(dirname "$PYTHON_VENV_PATH")"
-		python3 -m venv "$PYTHON_VENV_PATH"
+		"$python_cmd" -m venv "$PYTHON_VENV_PATH"
 	else
 		log "Using existing Python virtual environment at $PYTHON_VENV_PATH"
 	fi
@@ -124,7 +142,7 @@ main() {
 
 	# Upgrade pip to latest version
 	log "Upgrading pip to latest version..."
-	python3 -m pip install --upgrade pip
+	"$python_cmd" -m pip install --upgrade pip
 
 	# Always install requests (core dependency)
 	log "Installing requests (core dependency)..."
@@ -189,7 +207,7 @@ main() {
 			if ! verify_python_package flask; then
 				log "WARNING: flask package could not be verified"
 			fi
-			if ! python3 -c "import pytest" 2>/dev/null; then
+			if ! "$python_cmd" -c "import pytest" 2>/dev/null; then
 				log "WARNING: pytest module could not be verified"
 			fi
 			;;
@@ -197,7 +215,7 @@ main() {
 			if ! verify_python_package flask; then
 				log "WARNING: flask package could not be verified"
 			fi
-			if ! python3 -c "import pytest" 2>/dev/null; then
+			if ! "$python_cmd" -c "import pytest" 2>/dev/null; then
 				log "WARNING: pytest module could not be verified"
 			fi
 			;;
@@ -208,7 +226,7 @@ main() {
 			if ! verify_python_package flask; then
 				log "WARNING: flask package could not be verified"
 			fi
-			if ! python3 -c "import pytest" 2>/dev/null; then
+			if ! "$python_cmd" -c "import pytest" 2>/dev/null; then
 				log "WARNING: pytest module could not be verified"
 			fi
 			;;
@@ -219,8 +237,8 @@ main() {
 	# Print summary
 	log ""
 	log "=== Python Installation Summary ==="
-	log "Python: $(python3 --version)"
-	log "pip: $(python3 -m pip --version)"
+	log "Python: $($python_cmd --version)"
+	log "pip: $($python_cmd -m pip --version)"
 	log "Virtualenv: $PYTHON_VENV_PATH"
 
 	if [[ "$PYTHON_DATA_SCIENCE_STACK_ENABLE" == "true" ]]; then
@@ -234,16 +252,16 @@ main() {
 		reflex)
 			log "reflex: $(get_pip_package_version reflex) (recommended for Python development)"
 			log "flask: $(get_pip_package_version flask)"
-			log "pytest: $(python3 -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
+			log "pytest: $($python_cmd -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
 			;;
 		flask)
 			log "flask: $(get_pip_package_version flask)"
-			log "pytest: $(python3 -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
+			log "pytest: $($python_cmd -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
 			;;
 		both)
 			log "reflex: $(get_pip_package_version reflex)"
 			log "flask: $(get_pip_package_version flask)"
-			log "pytest: $(python3 -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
+			log "pytest: $($python_cmd -m pip show pytest 2>/dev/null | grep Version: | cut -d' ' -f2)"
 			;;
 		none)
 			;;

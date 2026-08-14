@@ -192,6 +192,42 @@ wizard_preflight_before_run_prompt() {
 	ensure_wizard_prerequisites
 }
 
+ensure_wsl_firewalld_dev_access() {
+	local gateway_ip interface_zone
+
+	if ! sp_is_wsl; then
+		return 0
+	fi
+
+	if ! command -v firewall-cmd >/dev/null 2>&1; then
+		log "firewalld is not installed; skipping WSL firewall normalization."
+		return 0
+	fi
+
+	if ! systemctl is-active --quiet firewalld 2>/dev/null; then
+		log "firewalld is not active; skipping WSL firewall normalization."
+		return 0
+	fi
+
+	gateway_ip="$(ip route | awk '/^default / {print $3; exit}')"
+	interface_zone="$(firewall-cmd --get-zone-of-interface=eth0 2>/dev/null || true)"
+	interface_zone="${interface_zone:-public}"
+
+	if [[ -n "$gateway_ip" ]]; then
+		firewall-cmd --zone=trusted --add-source="${gateway_ip}/32" >/dev/null 2>&1 || true
+		firewall-cmd --permanent --zone=trusted --add-source="${gateway_ip}/32" >/dev/null 2>&1 || true
+		log "Added WSL host gateway ${gateway_ip}/32 to firewalld trusted zone."
+	fi
+
+	firewall-cmd --zone="$interface_zone" --add-service=http >/dev/null 2>&1 || true
+	firewall-cmd --zone="$interface_zone" --add-service=https >/dev/null 2>&1 || true
+	firewall-cmd --permanent --zone="$interface_zone" --add-service=http >/dev/null 2>&1 || true
+	firewall-cmd --permanent --zone="$interface_zone" --add-service=https >/dev/null 2>&1 || true
+
+	firewall-cmd --reload >/dev/null 2>&1 || true
+	log "Ensured firewalld allows HTTP/HTTPS on zone '$interface_zone' for WSL development access."
+}
+
 validate_env_key() {
 	local key
 	key="$1"
@@ -531,16 +567,16 @@ wizard() {
 		set_env_key "WEB_SSL_ENABLE" "false"
 		unset_env_key "WEB_SSL_BASE_DOMAIN"
 		set_env_key "WEB_SSL_CERT_EXPIRY" "$ssl_cert_expiry_default"
-		set_env_key "WEB_SSL_FORCE_HTTPS_REDIRECT" "$ssl_redirect_default"
+		set_env_key "WEB_SSL_FORCE_HTTPS_REDIRECT" "false"
 	else
 		set_env_key "WEB_SERVER" "$selected_web_server"
 		value="$(read_bool 'WEB_SSL_ENABLE (true/false)' "$ssl_enable_default")"
 		set_env_key "WEB_SSL_ENABLE" "$value"
 		ssl_enable_choice="$value"
 		set_env_key "WEB_SSL_CERT_EXPIRY" "$ssl_cert_expiry_default"
-		value="$(read_bool 'WEB_SSL_FORCE_HTTPS_REDIRECT (true/false)' "$ssl_redirect_default")"
-		set_env_key "WEB_SSL_FORCE_HTTPS_REDIRECT" "$value"
 		if [[ "$ssl_enable_choice" == "true" ]]; then
+			value="$(read_bool 'WEB_SSL_FORCE_HTTPS_REDIRECT (true/false)' "$ssl_redirect_default")"
+			set_env_key "WEB_SSL_FORCE_HTTPS_REDIRECT" "$value"
 			while true; do
 				value="$(read_with_default 'WEB_SSL_BASE_DOMAIN (must end in .local, example: app.local)' "$ssl_base_domain_default")"
 				if is_valid_local_base_domain "$value"; then
@@ -550,6 +586,7 @@ wizard() {
 			done
 			set_env_key "WEB_SSL_BASE_DOMAIN" "$value"
 		else
+			set_env_key "WEB_SSL_FORCE_HTTPS_REDIRECT" "false"
 			unset_env_key "WEB_SSL_BASE_DOMAIN"
 		fi
 	fi
@@ -1098,6 +1135,7 @@ run_full_provisioning() {
 
 	log "Starting Rocky provisioning on $SP_OS_NAME"
 	ensure_wsl_systemd_enabled
+	ensure_wsl_firewalld_dev_access
 	sp_pkg_refresh_cache
 	sp_pkg_upgrade_refresh
 	sp_pkg_install "${BASE_PACKAGES[@]}"

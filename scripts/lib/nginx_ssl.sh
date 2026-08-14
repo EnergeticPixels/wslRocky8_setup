@@ -163,7 +163,9 @@ nginx_ssl_write_server_block() {
 	mkdir -p /etc/nginx/snippets
 	cat > /etc/nginx/snippets/php-fpm.conf <<EOF
 location ~ \.php$ {
-	include snippets/fastcgi-php.conf;
+	include fastcgi_params;
+	fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+	fastcgi_index index.php;
 	fastcgi_pass unix:${php_fpm_socket};
 }
 
